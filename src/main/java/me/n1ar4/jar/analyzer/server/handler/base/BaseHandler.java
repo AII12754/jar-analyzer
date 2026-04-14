@@ -62,9 +62,16 @@ public class BaseHandler {
         return d.get(0);
     }
 
+    private static void addCorsHeaders(NanoHTTPD.Response response) {
+        response.addHeader("Access-Control-Allow-Origin", "*");
+        response.addHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        response.addHeader("Access-Control-Allow-Headers", "Content-Type");
+    }
+
     public NanoHTTPD.Response buildJSON(String json) {
+        NanoHTTPD.Response response;
         if (json == null || json.isEmpty()) {
-            return NanoHTTPD.newFixedLengthResponse(
+            response = NanoHTTPD.newFixedLengthResponse(
                     NanoHTTPD.Response.Status.OK,
                     "application/json",
                     "{}");
@@ -72,19 +79,21 @@ public class BaseHandler {
             byte[] bytes = json.getBytes(StandardCharsets.UTF_8);
             int lengthInBytes = bytes.length;
             if (lengthInBytes > 3 * 1024 * 1024) {
-                return NanoHTTPD.newFixedLengthResponse(
+                response = NanoHTTPD.newFixedLengthResponse(
                         NanoHTTPD.Response.Status.INTERNAL_ERROR,
                         "text/html",
                         "<h1>JAR ANALYZER SERVER</h1>" +
                                 "<h2>JSON IS TOO LARGE</h2>" +
                                 "<h2>MAX SIZE 3 MB</h2>");
             } else {
-                return NanoHTTPD.newFixedLengthResponse(
+                response = NanoHTTPD.newFixedLengthResponse(
                         NanoHTTPD.Response.Status.OK,
                         "application/json",
                         json);
             }
         }
+        addCorsHeaders(response);
+        return response;
     }
 
     public NanoHTTPD.Response needParam(String s) {

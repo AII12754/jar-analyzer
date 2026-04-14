@@ -33,7 +33,7 @@ public class TaintResultDialog extends JFrame {
     private static final Logger logger = LogManager.getLogger();
 
     private JTable resultTable;
-    private JTextArea detailTextArea;
+    private JEditorPane detailPane;
     private JLabel summaryLabel;
     private JLabel sanitizerCountLabel;
     private JTable sanitizerTable;
@@ -86,11 +86,13 @@ public class TaintResultDialog extends JFrame {
         resultTable.getColumnModel().getColumn(5).setPreferredWidth(80);
         resultTable.getColumnModel().getColumn(6).setPreferredWidth(100);
 
-        // 创建详情文本区域
-        detailTextArea = new JTextArea();
-        detailTextArea.setEditable(false);
-        detailTextArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
-        detailTextArea.setText("请选择一行查看详细的污点分析过程...");
+        // 创建详情面板（HTML 渲染）
+        detailPane = new JEditorPane();
+        detailPane.setEditable(false);
+        detailPane.setContentType("text/html");
+        detailPane.setText("<html><body style='font-family:monospaced;padding:8px'>"
+                + "<i><font color='#888888'>请选择一行查看详细的污点分析过程...</font></i>"
+                + "</body></html>");
 
         // 创建统计标签
         summaryLabel = new JLabel();
@@ -153,10 +155,10 @@ public class TaintResultDialog extends JFrame {
         JSplitPane bottomSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
         bottomSplitPane.setResizeWeight(0.6);
 
-        // 左侧：详情文本
+        // 左侧：详情面板
         JPanel detailPanel = new JPanel(new BorderLayout());
         detailPanel.setBorder(new TitledBorder("污点分析详情"));
-        JScrollPane detailScrollPane = new JScrollPane(detailTextArea);
+        JScrollPane detailScrollPane = new JScrollPane(detailPane);
         detailPanel.add(detailScrollPane, BorderLayout.CENTER);
 
         // 右侧：Sanitizer规则表格
@@ -285,80 +287,121 @@ public class TaintResultDialog extends JFrame {
         });
     }
 
+    private static String esc(String s) {
+        if (s == null) return "";
+        return s.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
+    }
+
+    private String taintLogToHtml(String taintText) {
+        if (taintText == null || taintText.trim().isEmpty()) {
+            return "<i><font color='#888888'>无污点分析过程信息</font></i>";
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("<table width='100%' cellpadding='2' cellspacing='0'>");
+        for (String line : taintText.split("\n")) {
+            if (line.isEmpty()) continue;
+            String color;
+            String bg;
+            if (line.contains("通过")) {
+                color = "#1b5e20"; bg = "#c8e6c9";
+            } else if (line.contains("失败") || line.contains("错误")) {
+                color = "#b71c1c"; bg = "#ffcdd2";
+            } else if (line.contains("开始污点分析")) {
+                color = "#0d47a1"; bg = "#bbdefb";
+            } else if (line.contains("数据流结果")) {
+                color = "#e65100"; bg = "#ffe0b2";
+            } else if (line.contains("方法:")) {
+                color = "#4527a0"; bg = "#ede7f6";
+            } else if (line.contains("接口类型污点")) {
+                color = "#1b5e20"; bg = "#f1f8e9";
+            } else {
+                color = "#424242"; bg = "transparent";
+            }
+            sb.append("<tr bgcolor='").append(bg).append("'>");
+            sb.append("<td><font color='").append(color).append("'><tt>")
+              .append(esc(line)).append("</tt></font></td></tr>");
+        }
+        sb.append("</table>");
+        return sb.toString();
+    }
+
     private void showDetailForRow(int row) {
         if (originalTaintResults == null || row >= originalTaintResults.size() || row < 0) {
-            detailTextArea.setText("无法获取详细信息");
+            detailPane.setText("<html><body><font color='red'>无法获取详细信息</font></body></html>");
             return;
         }
 
         TaintResult taintResult = originalTaintResults.get(row);
-        StringBuilder detailText = new StringBuilder();
+        StringBuilder html = new StringBuilder();
+        html.append("<html><body style='font-family:SansSerif;margin:8px'>");
 
-        // 显示基本信息
-        detailText.append("==================== 污点分析详情 ===================\n");
-        detailText.append("序号: ").append(row + 1).append("\n");
+        // 标题
+        html.append("<h3><font color='#1565C0'>污点分析详情 #").append(row + 1).append("</font></h3>");
 
         DFSResult dfsResult = taintResult.getDfsResult();
         if (dfsResult != null) {
-            // Source信息
+            // Source / Sink 信息表
+            html.append("<table border='1' cellpadding='4' cellspacing='0' width='100%'>");
             if (dfsResult.getSource() != null) {
-                detailText.append("Source类: ").append(dfsResult.getSource().getClassReference().getName()).append("\n");
-                detailText.append("Source方法: ").append(dfsResult.getSource().getName()).append("\n");
-                detailText.append("Source描述: ").append(dfsResult.getSource().getDesc()).append("\n");
+                html.append("<tr bgcolor='#E8F5E9'>");
+                html.append("<td width='100'><b><font color='#2E7D32'>Source 类</font></b></td>");
+                html.append("<td><tt>").append(esc(dfsResult.getSource().getClassReference().getName())).append("</tt></td></tr>");
+                html.append("<tr bgcolor='#E8F5E9'>");
+                html.append("<td><b><font color='#2E7D32'>Source 方法</font></b></td>");
+                html.append("<td><tt>").append(esc(dfsResult.getSource().getName()))
+                   .append(esc(dfsResult.getSource().getDesc())).append("</tt></td></tr>");
             }
-
-            // Sink信息
             if (dfsResult.getSink() != null) {
-                detailText.append("Sink类: ").append(dfsResult.getSink().getClassReference().getName()).append("\n");
-                detailText.append("Sink方法: ").append(dfsResult.getSink().getName()).append("\n");
-                detailText.append("Sink描述: ").append(dfsResult.getSink().getDesc()).append("\n");
+                html.append("<tr bgcolor='#FFEBEE'>");
+                html.append("<td><b><font color='#C62828'>Sink 类</font></b></td>");
+                html.append("<td><tt>").append(esc(dfsResult.getSink().getClassReference().getName())).append("</tt></td></tr>");
+                html.append("<tr bgcolor='#FFEBEE'>");
+                html.append("<td><b><font color='#C62828'>Sink 方法</font></b></td>");
+                html.append("<td><tt>").append(esc(dfsResult.getSink().getName()))
+                   .append(esc(dfsResult.getSink().getDesc())).append("</tt></td></tr>");
             }
-
-            detailText.append("调用链深度: ").append(dfsResult.getDepth()).append("\n");
-            detailText.append("分析模式: ");
+            html.append("<tr><td><b>调用链深度</b></td><td>").append(dfsResult.getDepth()).append("</td></tr>");
+            String modeText;
             switch (dfsResult.getMode()) {
-                case DFSResult.FROM_SOURCE_TO_SINK:
-                    detailText.append("从Source到Sink");
-                    break;
-                case DFSResult.FROM_SINK_TO_SOURCE:
-                    detailText.append("从Sink到Source");
-                    break;
-                case DFSResult.FROM_SOURCE_TO_ALL:
-                    detailText.append("从Source到所有可能点");
-                    break;
-                default:
-                    detailText.append("未知模式");
+                case DFSResult.FROM_SOURCE_TO_SINK: modeText = "从 Source 到 Sink"; break;
+                case DFSResult.FROM_SINK_TO_SOURCE: modeText = "从 Sink 到 Source"; break;
+                case DFSResult.FROM_SOURCE_TO_ALL:  modeText = "从 Source 到所有可能点"; break;
+                default: modeText = "未知模式";
             }
-            detailText.append("\n\n");
+            html.append("<tr><td><b>分析模式</b></td><td>").append(modeText).append("</td></tr>");
+            html.append("</table>");
 
-            // 调用链详情
-            detailText.append("==================== 调用链详情 ===================\n");
+            // 调用链步骤
             List<MethodReference.Handle> methodList = dfsResult.getMethodList();
             if (methodList != null && !methodList.isEmpty()) {
+                html.append("<h3><font color='#1565C0'>调用链详情</font></h3>");
+                html.append("<table border='1' cellpadding='4' cellspacing='0' width='100%'>");
                 for (int i = 0; i < methodList.size(); i++) {
-                    MethodReference.Handle method = methodList.get(i);
-                    detailText.append(String.format("[%d] %s.%s%s\n",
-                            i + 1,
-                            method.getClassReference().getName(),
-                            method.getName(),
-                            method.getDesc()));
+                    MethodReference.Handle m = methodList.get(i);
+                    String bg = (i == 0) ? "#E8F5E9" : (i == methodList.size() - 1 ? "#FFEBEE" : "#FFFDE7");
+                    String label = (i == 0) ? "SOURCE" : (i == methodList.size() - 1 ? "SINK" : String.valueOf(i + 1));
+                    String fc = (i == 0) ? "#2E7D32" : (i == methodList.size() - 1 ? "#C62828" : "#666666");
+                    html.append("<tr bgcolor='").append(bg).append("'>");
+                    html.append("<td width='60' align='center'><b><font color='").append(fc).append("'>").append(label).append("</font></b></td>");
+                    html.append("<td><tt>").append(esc(m.getClassReference().getName())).append(".").append(esc(m.getName())).append(esc(m.getDesc())).append("</tt></td>");
+                    html.append("</tr>");
+                    if (i < methodList.size() - 1) {
+                        html.append("<tr><td colspan='2' align='center'><font color='#90A4AE'>|</font></td></tr>");
+                    }
                 }
-            } else {
-                detailText.append("无调用链信息\n");
+                html.append("</table>");
             }
         }
 
-        detailText.append("\n==================== 污点分析过程 ===================\n");
-        // 显示污点分析的详细文本
-        String taintText = taintResult.getTaintText();
-        if (taintText != null && !taintText.trim().isEmpty()) {
-            detailText.append(taintText);
-        } else {
-            detailText.append("无污点分析过程信息");
-        }
+        // 污点传播过程（着色日志）
+        html.append("<h3><font color='#1565C0'>污点传播过程</font></h3>");
+        html.append(taintLogToHtml(taintResult.getTaintText()));
 
-        detailTextArea.setText(detailText.toString());
-        detailTextArea.setCaretPosition(0); // 滚动到顶部
+        html.append("</body></html>");
+        detailPane.setText(html.toString());
+        detailPane.setCaretPosition(0);
     }
 
     private void exportResults() {

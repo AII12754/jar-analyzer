@@ -122,6 +122,7 @@
     const nodeMap = new Map();
     const expandedNodes = new Set();
     const methodNodeMap = new Map();
+    var childNodes = {}; // parentId -> [childId, ...]
 
     function mkey(cn, mn, md) { return cn + '|' + mn + '|' + (md || ''); }
 
@@ -321,6 +322,9 @@
             nodes.push(newNode);
             nodeMap.set(targetId, newNode);
             methodNodeMap.set(key, targetId);
+            // track parent -> child for collapse
+            if (!childNodes[parentNode.id]) childNodes[parentNode.id] = [];
+            childNodes[parentNode.id].push(targetId);
         } else {
             targetId = existId;
         }
@@ -339,6 +343,47 @@
 
     function collapseNode(node) {
         if (!expandedNodes.has(node.id)) return;
+
+        // collect all descendant IDs recursively
+        function collectDescendants(id, result) {
+            var children = childNodes[id] || [];
+            children.forEach(function(cid) {
+                if (result.indexOf(cid) === -1) {
+                    result.push(cid);
+                    collectDescendants(cid, result);
+                }
+            });
+        }
+        var toRemove = [];
+        collectDescendants(node.id, toRemove);
+        var toRemoveSet = {};
+        toRemove.forEach(function(id) { toRemoveSet[id] = true; });
+
+        // remove descendant nodes
+        for (var i = nodes.length - 1; i >= 0; i--) {
+            if (toRemoveSet[nodes[i].id]) {
+                nodes.splice(i, 1);
+            }
+        }
+        // remove links that touch any removed node
+        for (var j = links.length - 1; j >= 0; j--) {
+            var ls = links[j].source.id !== undefined ? links[j].source.id : links[j].source;
+            var lt = links[j].target.id !== undefined ? links[j].target.id : links[j].target;
+            if (toRemoveSet[ls] || toRemoveSet[lt]) {
+                links.splice(j, 1);
+            }
+        }
+        // clean up maps
+        toRemove.forEach(function(id) {
+            var nd = nodeMap.get(id);
+            if (nd && nd.className) {
+                methodNodeMap.delete(mkey(nd.className, nd.methodName, nd.methodDesc));
+            }
+            nodeMap.delete(id);
+            expandedNodes.delete(id);
+            delete childNodes[id];
+        });
+        delete childNodes[node.id];
         expandedNodes.delete(node.id);
         updateGraph();
     }
