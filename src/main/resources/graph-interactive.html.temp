@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jar Analyzer — Interactive Call Graph</title>
+    <script src="__D3JS__"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; overflow: hidden; }
+
+        #toolbar {
+            position: fixed; top: 0; left: 0; right: 0; height: 48px;
+            background: #161b22; border-bottom: 1px solid #30363d;
+            display: flex; align-items: center; padding: 0 16px; z-index: 10;
+        }
+        #toolbar .title { font-size: 14px; color: #58a6ff; font-weight: 600; margin-right: 24px; white-space: nowrap; }
+        #toolbar .stat { font-size: 12px; color: #8b949e; margin-right: 16px; }
+        #toolbar .stat span { color: #58a6ff; font-weight: 600; }
+        .btn {
+            background: #21262d; border: 1px solid #30363d; color: #c9d1d9;
+            padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; margin-right: 6px;
+        }
+        .btn:hover { background: #30363d; border-color: #58a6ff; }
+
+        #info-panel {
+            position: fixed; top: 48px; right: 0; width: 300px;
+            background: #161b22; border-left: 1px solid #30363d;
+            padding: 16px; z-index: 5; height: calc(100% - 48px);
+            overflow-y: auto; display: none; font-size: 12px;
+        }
+        #info-panel h3 { color: #58a6ff; font-size: 13px; margin-bottom: 12px; border-bottom: 1px solid #30363d; padding-bottom: 8px; }
+        #info-panel .field { margin-bottom: 8px; }
+        #info-panel .field .label { color: #8b949e; font-size: 11px; display: block; margin-bottom: 2px; }
+        #info-panel .field .value { color: #c9d1d9; word-break: break-all; font-family: 'SF Mono', Menlo, monospace; }
+
+        #legend {
+            position: fixed; bottom: 16px; left: 16px;
+            background: #161b22ee; border: 1px solid #30363d; border-radius: 8px;
+            padding: 12px 16px; z-index: 5; font-size: 11px;
+        }
+        #legend .title { color: #8b949e; margin-bottom: 6px; font-weight: 600; }
+        #legend .item { display: flex; align-items: center; margin-bottom: 4px; }
+        #legend .dot { width: 12px; height: 12px; border-radius: 3px; margin-right: 8px; flex-shrink: 0; }
+
+        #hint {
+            position: fixed; bottom: 16px; right: 16px;
+            background: #161b22ee; border: 1px solid #30363d; border-radius: 8px;
+            padding: 10px 14px; z-index: 5; font-size: 11px; color: #8b949e;
+        }
+
+        #tooltip {
+            position: absolute; background: #1c2128; border: 1px solid #30363d;
+            border-radius: 6px; padding: 8px 12px; font-size: 11px;
+            pointer-events: none; display: none; z-index: 20; max-width: 350px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+        #tooltip .tt-class { color: #8b949e; font-family: monospace; font-size: 10px; margin-top: 4px; }
+
+        svg { width: 100%; height: 100%; }
+        .link-line { stroke-opacity: 0.35; stroke-width: 1.5; }
+        .node-group { cursor: pointer; }
+        .node-rect { stroke-width: 1.5; }
+        .node-text { fill: #fff; pointer-events: none; font-size: 11px; }
+        .node-badge { fill: #8b949e; font-size: 9px; pointer-events: none; }
+    </style>
+</head>
+<body>
+<div id="toolbar">
+    <div class="title">Jar Analyzer Call Graph</div>
+    <div class="stat">Nodes: <span id="node-count">0</span></div>
+    <div class="stat">Edges: <span id="edge-count">0</span></div>
+    <button class="btn" onclick="resetView()">Reset View</button>
+    <button class="btn" onclick="toggleInfo()">Info Panel</button>
+</div>
+
+<div id="info-panel">
+    <h3>Method Details</h3>
+    <div class="field"><div class="label">Class Name</div><div class="value" id="info-class">—</div></div>
+    <div class="field"><div class="label">Method Name</div><div class="value" id="info-method">—</div></div>
+    <div class="field"><div class="label">Descriptor</div><div class="value" id="info-desc">—</div></div>
+    <div class="field"><div class="label">Direct Callers</div><div class="value" id="info-callers">—</div></div>
+    <div class="field"><div class="label">Direct Callees</div><div class="value" id="info-callees">—</div></div>
+    <div class="field"><div class="label">Status</div><div class="value" id="info-status">—</div></div>
+    <hr style="border-color:#30363d; margin:12px 0">
+    <p style="color:#8b949e; line-height:1.6">
+        <b>Double-click</b> a node to expand its call relationships.<br>
+        <b>Right-click</b> an expanded node to collapse.<br>
+        <b>Click</b> a node to view details.<br>
+        <b>Scroll</b> to zoom, <b>drag</b> to pan.
+    </p>
+</div>
+
+<div id="legend">
+    <div class="title">LEGEND</div>
+    <div class="item"><div class="dot" style="background:#f0883e"></div>Current Method (entry point)</div>
+    <div class="item"><div class="dot" style="background:#3fb950"></div>Caller (who calls this method)</div>
+    <div class="item"><div class="dot" style="background:#58a6ff"></div>Callee (called by this method)</div>
+    <div class="item"><div class="dot" style="background:#bc8cff"></div>Expanded Node</div>
+</div>
+
+<div id="hint">
+    Double-click to expand &middot; Right-click to collapse &middot; Scroll to zoom
+</div>
+
+<div id="tooltip"></div>
+
+<svg></svg>
+
+<script>
+    const PORT = __PORT__;
+    const API = 'http://127.0.0.1:' + PORT + '/api';
+    const CURRENT = '__CURRENT_NODE__';
+
+    let nodes = [
+        __NODES__
+    ];
+    let links = [
+        __LINKS__
+    ];
+
+    const nodeMap = new Map();
+    const expandedNodes = new Set();
+    const methodNodeMap = new Map();
+
+    function mkey(cn, mn, md) { return cn + '|' + mn + '|' + (md || ''); }
+
+    nodes.forEach(function(n) {
+        nodeMap.set(n.id, n);
+        if (n.className) methodNodeMap.set(mkey(n.className, n.methodName, n.methodDesc), n.id);
+    });
+
+    var svg = d3.select('svg');
+    var width = window.innerWidth;
+    var height = window.innerHeight;
+    svg.attr('viewBox', [0, 0, width, height]);
+
+    var defs = svg.append('defs');
+
+    var glowFilter = defs.append('filter').attr('id', 'glow')
+        .attr('x', '-50%').attr('y', '-50%').attr('width', '200%').attr('height', '200%');
+    glowFilter.append('feGaussianBlur').attr('stdDeviation', '4').attr('result', 'blur');
+    var merge = glowFilter.append('feMerge');
+    merge.append('feMergeNode').attr('in', 'blur');
+    merge.append('feMergeNode').attr('in', 'SourceGraphic');
+
+    defs.append('marker').attr('id', 'arrowhead')
+        .attr('viewBox', '0 -5 10 10').attr('refX', 22).attr('refY', 0)
+        .attr('markerWidth', 8).attr('markerHeight', 8).attr('orient', 'auto')
+        .append('path').attr('d', 'M0,-4L8,0L0,4').attr('fill', '#484f58');
+
+    var g = svg.append('g');
+
+    var zoomBehavior = d3.zoom()
+        .scaleExtent([0.05, 5])
+        .on('zoom', function(event) { g.attr('transform', event.transform); });
+    svg.call(zoomBehavior);
+
+    var simulation = d3.forceSimulation()
+        .force('link', d3.forceLink().id(function(d) { return d.id; }).distance(200))
+        .force('charge', d3.forceManyBody().strength(-800))
+        .force('center', d3.forceCenter(width / 2, height / 2))
+        .force('collision', d3.forceCollide().radius(70))
+        .force('x', d3.forceX(width / 2).strength(0.02))
+        .force('y', d3.forceY(height / 2).strength(0.02));
+
+    var linkGroup = g.append('g').attr('class', 'links');
+    var nodeGroup = g.append('g').attr('class', 'nodes');
+
+    var linkSel, nodeSel;
+
+    function getNodeColor(n) {
+        if (n.id === CURRENT) return '#f0883e';
+        if (expandedNodes.has(n.id)) return '#bc8cff';
+        if (n.type === 'caller') return '#3fb950';
+        if (n.type === 'callee') return '#58a6ff';
+        return '#6e7681';
+    }
+
+    function getNodeStroke(n) {
+        if (n.id === CURRENT) return '#f5a623';
+        if (expandedNodes.has(n.id)) return '#a371f7';
+        return '#30363d';
+    }
+
+    function textWidth(text) {
+        var canvas = document.createElement('canvas');
+        var ctx = canvas.getContext('2d');
+        ctx.font = '11px -apple-system, BlinkMacSystemFont, sans-serif';
+        return ctx.measureText(text).width;
+    }
+
+    function shortName(fullClassName) {
+        var name = (fullClassName || '').replace(/\//g, '.');
+        return name.substring(name.lastIndexOf('.') + 1);
+    }
+
+    function updateGraph() {
+        linkSel = linkGroup.selectAll('line.link-line').data(links, function(d) {
+            var sid = d.source.id !== undefined ? d.source.id : d.source;
+            var tid = d.target.id !== undefined ? d.target.id : d.target;
+            return sid + '->' + tid;
+        });
+        linkSel.exit().transition().duration(300).attr('stroke-opacity', 0).remove();
+        var linkEnter = linkSel.enter().append('line')
+            .attr('class', 'link-line')
+            .attr('stroke', '#30363d')
+            .attr('marker-end', 'url(#arrowhead)')
+            .attr('stroke-opacity', 0);
+        linkEnter.transition().duration(500).attr('stroke-opacity', 0.35);
+        linkSel = linkEnter.merge(linkSel);
+
+        nodeSel = nodeGroup.selectAll('g.node-group').data(nodes, function(d) { return d.id; });
+        nodeSel.exit().transition().duration(300).attr('opacity', 0).remove();
+
+        var nodeEnter = nodeSel.enter().append('g')
+            .attr('class', 'node-group')
+            .attr('opacity', 0)
+            .call(d3.drag()
+                .on('start', dragStarted)
+                .on('drag', dragged)
+                .on('end', dragEnded));
+
+        nodeEnter.append('rect').attr('class', 'node-rect').attr('rx', 6).attr('ry', 6);
+        nodeEnter.append('text').attr('class', 'node-text').attr('text-anchor', 'middle').attr('dy', 4);
+
+        nodeEnter.transition().duration(600).attr('opacity', 1);
+
+        nodeEnter
+            .on('dblclick', function(event, d) { event.stopPropagation(); event.preventDefault(); expandNode(d); })
+            .on('click', function(event, d) { selectNode(d); })
+            .on('contextmenu', function(event, d) { event.preventDefault(); collapseNode(d); })
+            .on('mouseover', function(event, d) { showTooltip(event, d); })
+            .on('mouseout', hideTooltip);
+
+        nodeSel = nodeEnter.merge(nodeSel);
+
+        nodeSel.select('rect')
+            .attr('width', function(d) { return textWidth(d.name) + 28; })
+            .attr('height', 34)
+            .attr('x', function(d) { return -(textWidth(d.name) + 28) / 2; })
+            .attr('y', -17)
+            .attr('fill', getNodeColor)
+            .attr('stroke', getNodeStroke)
+            .attr('filter', function(d) { return d.id === CURRENT ? 'url(#glow)' : null; });
+
+        nodeSel.select('text').text(function(d) { return d.name; });
+
+        simulation.nodes(nodes);
+        simulation.force('link').links(links);
+        simulation.alpha(0.4).restart();
+        updateStats();
+    }
+
+    function updateStats() {
+        document.getElementById('node-count').textContent = nodes.length;
+        document.getElementById('edge-count').textContent = links.length;
+    }
+
+    simulation.on('tick', function() {
+        if (linkSel) {
+            linkSel
+                .attr('x1', function(d) { return d.source.x; })
+                .attr('y1', function(d) { return d.source.y; })
+                .attr('x2', function(d) { return d.target.x; })
+                .attr('y2', function(d) { return d.target.y; });
+        }
+        if (nodeSel) {
+            nodeSel.attr('transform', function(d) { return 'translate(' + d.x + ',' + d.y + ')'; });
+        }
+    });
+
+    function expandNode(node) {
+        if (expandedNodes.has(node.id)) return;
+        if (!node.className) return;
+        expandedNodes.add(node.id);
+
+        var cn = encodeURIComponent(node.className);
+        var mn = encodeURIComponent(node.methodName);
+        var md = encodeURIComponent(node.methodDesc || '');
+        var callersUrl = API + '/get_callers?class=' + cn + '&method=' + mn + '&desc=' + md;
+        var calleesUrl = API + '/get_callee?class=' + cn + '&method=' + mn + '&desc=' + md;
+
+        Promise.all([
+            fetch(callersUrl).then(function(r) { return r.json(); }),
+            fetch(calleesUrl).then(function(r) { return r.json(); })
+        ]).then(function(results) {
+            var callers = results[0] || [];
+            var callees = results[1] || [];
+
+            callers.forEach(function(m) {
+                addMethodNode(m, 'caller', node);
+            });
+            callees.forEach(function(m) {
+                addMethodNode(m, 'callee', node);
+            });
+            updateGraph();
+        }).catch(function(err) {
+            console.error('expand failed', err);
+            expandedNodes.delete(node.id);
+        });
+    }
+
+    function addMethodNode(m, type, parentNode) {
+        var key = mkey(m.className, m.methodName, m.methodDesc);
+        var existId = methodNodeMap.get(key);
+        var targetId;
+
+        if (!existId) {
+            targetId = 'n_' + Math.random().toString(36).substr(2, 10);
+            var newNode = {
+                id: targetId,
+                name: shortName(m.className) + ' ' + m.methodName,
+                className: m.className,
+                methodName: m.methodName,
+                methodDesc: m.methodDesc || '',
+                type: type,
+                x: parentNode.x + (Math.random() - 0.5) * 120,
+                y: parentNode.y + (Math.random() - 0.5) * 120
+            };
+            nodes.push(newNode);
+            nodeMap.set(targetId, newNode);
+            methodNodeMap.set(key, targetId);
+        } else {
+            targetId = existId;
+        }
+
+        var srcId = type === 'caller' ? targetId : parentNode.id;
+        var tgtId = type === 'caller' ? parentNode.id : targetId;
+        var exists = links.some(function(l) {
+            var ls = l.source.id !== undefined ? l.source.id : l.source;
+            var lt = l.target.id !== undefined ? l.target.id : l.target;
+            return ls === srcId && lt === tgtId;
+        });
+        if (!exists) {
+            links.push({ source: srcId, target: tgtId });
+        }
+    }
+
+    function collapseNode(node) {
+        if (!expandedNodes.has(node.id)) return;
+        expandedNodes.delete(node.id);
+        updateGraph();
+    }
+
+    function selectNode(node) {
+        var panel = document.getElementById('info-panel');
+        panel.style.display = 'block';
+        document.getElementById('info-class').textContent = (node.className || '—').replace(/\//g, '.');
+        document.getElementById('info-method').textContent = node.methodName || '—';
+        document.getElementById('info-desc').textContent = node.methodDesc || '—';
+
+        var callerCount = links.filter(function(l) {
+            return (l.target.id !== undefined ? l.target.id : l.target) === node.id;
+        }).length;
+        var calleeCount = links.filter(function(l) {
+            return (l.source.id !== undefined ? l.source.id : l.source) === node.id;
+        }).length;
+        document.getElementById('info-callers').textContent = callerCount + ' in graph';
+        document.getElementById('info-callees').textContent = calleeCount + ' in graph';
+        document.getElementById('info-status').textContent = expandedNodes.has(node.id) ? 'Expanded' : 'Collapsed';
+
+        nodeSel.select('rect')
+            .attr('stroke-width', function(d) { return d.id === node.id ? 3 : 1.5; })
+            .attr('stroke', function(d) { return d.id === node.id ? '#e3b341' : getNodeStroke(d); });
+
+        linkSel
+            .attr('stroke', function(d) {
+                return (d.source.id === node.id || d.target.id === node.id) ? '#58a6ff' : '#30363d';
+            })
+            .attr('stroke-opacity', function(d) {
+                return (d.source.id === node.id || d.target.id === node.id) ? 0.8 : 0.25;
+            })
+            .attr('stroke-width', function(d) {
+                return (d.source.id === node.id || d.target.id === node.id) ? 2.5 : 1.5;
+            });
+    }
+
+    function showTooltip(event, d) {
+        var tip = document.getElementById('tooltip');
+        tip.style.display = 'block';
+        tip.style.left = (event.pageX + 12) + 'px';
+        tip.style.top = (event.pageY - 12) + 'px';
+        tip.innerHTML = '<strong>' + d.name + '</strong>'
+            + '<div class="tt-class">' + (d.className || '').replace(/\//g, '.') + '</div>'
+            + '<div style="color:#8b949e;margin-top:4px;font-size:10px">'
+            + (expandedNodes.has(d.id) ? 'Right-click to collapse' : 'Double-click to expand') + '</div>';
+    }
+
+    function hideTooltip() { document.getElementById('tooltip').style.display = 'none'; }
+
+    function resetView() {
+        svg.transition().duration(500).call(zoomBehavior.transform, d3.zoomIdentity);
+    }
+
+    function toggleInfo() {
+        var p = document.getElementById('info-panel');
+        p.style.display = p.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function dragStarted(event, d) {
+        if (!event.active) simulation.alphaTarget(0.3).restart();
+        d.fx = d.x; d.fy = d.y;
+    }
+    function dragged(event, d) { d.fx = event.x; d.fy = event.y; }
+    function dragEnded(event, d) {
+        if (!event.active) simulation.alphaTarget(0);
+        d.fx = null; d.fy = null;
+    }
+
+    updateGraph();
+
+    setTimeout(function() {
+        var cur = nodes.find(function(n) { return n.id === CURRENT; });
+        if (cur && cur.x && cur.y) {
+            var t = d3.zoomIdentity.translate(width / 2 - cur.x, height / 2 - cur.y);
+            svg.transition().duration(600).call(zoomBehavior.transform, t);
+        }
+    }, 1200);
+</script>
+</body>
+</html>

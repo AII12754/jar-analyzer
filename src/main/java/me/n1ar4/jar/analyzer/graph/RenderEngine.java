@@ -28,6 +28,11 @@ public class RenderEngine {
         return fullClassName.substring(fullClassName.lastIndexOf('.') + 1);
     }
 
+    private static String escapeJs(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("'", "\\'");
+    }
+
     public static String processGraph(MethodResult cur,
                                       List<MethodResult> caller,
                                       List<MethodResult> callee) {
@@ -56,8 +61,16 @@ public class RenderEngine {
         for (Map.Entry<String, MethodResult> entry : methodIdStringMap.entrySet()) {
             String id = entry.getKey();
             MethodResult mr = entry.getValue();
-            String temp = String.format("{ id: '%s', name: '%s' },\n", id,
-                    getShortClassName(mr.getClassName()) + " " + mr.getMethodName());
+            String nodeType = id.equals(curId) ? "current"
+                    : callerIds.contains(id) ? "caller" : "callee";
+            String temp = String.format(
+                    "{ id: '%s', name: '%s', className: '%s', methodName: '%s', methodDesc: '%s', type: '%s' },\n",
+                    id,
+                    getShortClassName(mr.getClassName()) + " " + mr.getMethodName(),
+                    escapeJs(mr.getClassName()),
+                    escapeJs(mr.getMethodName()),
+                    escapeJs(mr.getMethodDesc() != null ? mr.getMethodDesc() : ""),
+                    nodeType);
             nodesBuffer.append(temp);
         }
 

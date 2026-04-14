@@ -71,6 +71,8 @@ public class PathMatcher {
         handlers.put("/api/cfr_code", new GetCodeCFRHandler());
 
         handlers.put("/api/dfs_analyze", new DFSHandler());
+
+        handlers.put("/api/taint_graph", new TaintGraphHandler());
     }
 
     public PathMatcher(ServerConfig config) {

@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jar Analyzer — Taint Flow Analysis</title>
+    <script src="__D3JS__"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #0d1117; color: #c9d1d9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+        #header {
+            background: #161b22; border-bottom: 1px solid #30363d;
+            padding: 16px 24px; display: flex; align-items: center; justify-content: space-between;
+        }
+        #header h1 { font-size: 16px; color: #58a6ff; font-weight: 600; }
+        .cards { display: flex; gap: 12px; }
+        .card {
+            padding: 8px 20px; border-radius: 8px; text-align: center;
+            font-size: 12px; border: 1px solid #30363d;
+        }
+        .card .num { font-size: 24px; font-weight: 700; display: block; margin-bottom: 2px; }
+        .card-total { background: #161b22; }
+        .card-total .num { color: #58a6ff; }
+        .card-vuln { background: #2d1215; border-color: #f8514966; }
+        .card-vuln .num { color: #f85149; }
+        .card-safe { background: #12261e; border-color: #3fb95066; }
+        .card-safe .num { color: #3fb950; }
+
+        #chains { padding: 24px; }
+
+        .chain-card {
+            background: #161b22; border: 1px solid #30363d; border-radius: 10px;
+            margin-bottom: 16px; overflow: hidden; transition: border-color 0.3s;
+        }
+        .chain-card:hover { border-color: #484f58; }
+        .chain-card.tainted { border-left: 4px solid #f85149; }
+        .chain-card.safe { border-left: 4px solid #3fb950; }
+
+        .chain-header {
+            padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
+            cursor: pointer; user-select: none;
+        }
+        .chain-header:hover { background: #1c2128; }
+        .chain-title { font-size: 13px; font-weight: 600; }
+        .chain-badge {
+            padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 600;
+        }
+        .badge-vuln { background: #f8514933; color: #f85149; }
+        .badge-safe { background: #3fb95033; color: #3fb950; }
+
+        .chain-body { padding: 0 16px 16px; display: none; }
+        .chain-body.open { display: block; }
+
+        .flow-container { position: relative; overflow-x: auto; padding: 16px 0; }
+        .flow-svg { display: block; }
+
+        .flow-node {
+            cursor: default;
+        }
+        .flow-node rect {
+            rx: 6; ry: 6; stroke-width: 1.5;
+        }
+        .flow-node text {
+            fill: #fff; font-size: 10px; pointer-events: none;
+        }
+        .flow-edge { stroke-width: 2; fill: none; }
+        .flow-edge-tainted { stroke: #f85149; stroke-opacity: 0.7; }
+        .flow-edge-clean { stroke: #30363d; stroke-opacity: 0.5; }
+
+        .particle { fill: #f85149; opacity: 0.9; }
+
+        .taint-detail {
+            margin-top: 12px; background: #0d1117; border: 1px solid #30363d;
+            border-radius: 6px; padding: 12px; font-size: 11px;
+            font-family: 'SF Mono', Menlo, Consolas, monospace;
+            color: #8b949e; white-space: pre-wrap; max-height: 200px; overflow-y: auto;
+        }
+
+        .source-node { fill: #238636; stroke: #3fb950; }
+        .sink-node { fill: #da3633; stroke: #f85149; }
+        .tainted-node { fill: #9e6a03; stroke: #d29922; }
+        .clean-node { fill: #21262d; stroke: #484f58; }
+
+        .depth-label { font-size: 11px; color: #8b949e; margin-left: 8px; }
+        .no-data { text-align: center; padding: 60px; color: #484f58; font-size: 14px; }
+    </style>
+</head>
+<body>
+
+<div id="header">
+    <h1>Taint Flow Analysis Visualization</h1>
+    <div class="cards">
+        <div class="card card-total"><span class="num" id="total-count">0</span>Total Chains</div>
+        <div class="card card-vuln"><span class="num" id="vuln-count">0</span>Tainted (Vulnerable)</div>
+        <div class="card card-safe"><span class="num" id="safe-count">0</span>Safe</div>
+    </div>
+</div>
+
+<div id="chains"></div>
+
+<script>
+    var chainsData = __CHAINS_DATA__;
+
+    var totalCount = chainsData.length;
+    var vulnCount = chainsData.filter(function(c) { return c.tainted; }).length;
+    var safeCount = totalCount - vulnCount;
+
+    document.getElementById('total-count').textContent = totalCount;
+    document.getElementById('vuln-count').textContent = vulnCount;
+    document.getElementById('safe-count').textContent = safeCount;
+
+    if (totalCount === 0) {
+        document.getElementById('chains').innerHTML = '<div class="no-data">No call chains found for the given parameters.</div>';
+    }
+
+    var container = document.getElementById('chains');
+
+    chainsData.forEach(function(chain, idx) {
+        var card = document.createElement('div');
+        card.className = 'chain-card ' + (chain.tainted ? 'tainted' : 'safe');
+
+        var methods = chain.methods || [];
+        var sourceName = methods.length > 0 ? shortN(methods[0].className) + '.' + methods[0].methodName : '?';
+        var sinkName = methods.length > 1 ? shortN(methods[methods.length - 1].className) + '.' + methods[methods.length - 1].methodName : '?';
+
+        var header = document.createElement('div');
+        header.className = 'chain-header';
+        header.innerHTML = '<div>'
+            + '<span class="chain-title">Chain #' + (idx + 1) + '</span>'
+            + '<span class="depth-label">depth: ' + chain.depth + '</span>'
+            + '</div>'
+            + '<div style="display:flex;align-items:center;gap:8px">'
+            + '<span style="font-size:11px;color:#8b949e">' + sourceName + ' → ' + sinkName + '</span>'
+            + '<span class="chain-badge ' + (chain.tainted ? 'badge-vuln' : 'badge-safe') + '">'
+            + (chain.tainted ? 'TAINTED' : 'SAFE') + '</span>'
+            + '</div>';
+
+        var body = document.createElement('div');
+        body.className = 'chain-body';
+
+        header.addEventListener('click', function() {
+            body.classList.toggle('open');
+            if (body.classList.contains('open') && !body.hasAttribute('data-rendered')) {
+                body.setAttribute('data-rendered', 'true');
+                renderChainFlow(body, chain, idx);
+            }
+        });
+
+        card.appendChild(header);
+        card.appendChild(body);
+        container.appendChild(card);
+    });
+
+    function shortN(full) {
+        var n = (full || '').replace(/\//g, '.');
+        return n.substring(n.lastIndexOf('.') + 1);
+    }
+
+    function renderChainFlow(container, chain, idx) {
+        var methods = chain.methods || [];
+        if (methods.length === 0) return;
+
+        var nodeW = 140, nodeH = 44, gapX = 60, padX = 20, padY = 30;
+        var totalW = methods.length * nodeW + (methods.length - 1) * gapX + padX * 2;
+        var totalH = nodeH + padY * 2 + 20;
+
+        var flowDiv = document.createElement('div');
+        flowDiv.className = 'flow-container';
+
+        var svgEl = d3.select(flowDiv).append('svg')
+            .attr('class', 'flow-svg')
+            .attr('width', totalW)
+            .attr('height', totalH);
+
+        var defs = svgEl.append('defs');
+        defs.append('marker').attr('id', 'flow-arrow-' + idx)
+            .attr('viewBox', '0 -5 10 10').attr('refX', 10).attr('refY', 0)
+            .attr('markerWidth', 6).attr('markerHeight', 6).attr('orient', 'auto')
+            .append('path').attr('d', 'M0,-4L8,0L0,4').attr('fill', '#f85149');
+        defs.append('marker').attr('id', 'flow-arrow-clean-' + idx)
+            .attr('viewBox', '0 -5 10 10').attr('refX', 10).attr('refY', 0)
+            .attr('markerWidth', 6).attr('markerHeight', 6).attr('orient', 'auto')
+            .append('path').attr('d', 'M0,-4L8,0L0,4').attr('fill', '#484f58');
+
+        var nodePositions = [];
+        methods.forEach(function(m, i) {
+            var x = padX + i * (nodeW + gapX);
+            var y = padY;
+            nodePositions.push({ x: x, y: y, m: m });
+        });
+
+        for (var i = 0; i < nodePositions.length - 1; i++) {
+            var from = nodePositions[i];
+            var to = nodePositions[i + 1];
+            var isTaintedEdge = chain.tainted && from.m.taintStatus !== 'clean';
+            svgEl.append('line')
+                .attr('class', 'flow-edge ' + (isTaintedEdge ? 'flow-edge-tainted' : 'flow-edge-clean'))
+                .attr('x1', from.x + nodeW).attr('y1', from.y + nodeH / 2)
+                .attr('x2', to.x).attr('y2', to.y + nodeH / 2)
+                .attr('marker-end', 'url(#' + (isTaintedEdge ? 'flow-arrow-' : 'flow-arrow-clean-') + idx + ')');
+
+            if (isTaintedEdge) {
+                animateParticle(svgEl, from.x + nodeW, from.y + nodeH / 2, to.x, to.y + nodeH / 2, idx);
+            }
+        }
+
+        nodePositions.forEach(function(pos, i) {
+            var m = pos.m;
+            var isSource = i === 0;
+            var isSink = i === methods.length - 1;
+            var nodeClass;
+            if (isSource) nodeClass = 'source-node';
+            else if (isSink) nodeClass = 'sink-node';
+            else if (m.taintStatus === 'tainted') nodeClass = 'tainted-node';
+            else nodeClass = 'clean-node';
+
+            var grp = svgEl.append('g')
+                .attr('class', 'flow-node')
+                .attr('transform', 'translate(' + pos.x + ',' + pos.y + ')');
+
+            grp.append('rect')
+                .attr('class', nodeClass)
+                .attr('width', nodeW).attr('height', nodeH);
+
+            grp.append('text')
+                .attr('x', nodeW / 2).attr('y', 18)
+                .attr('text-anchor', 'middle')
+                .text(shortN(m.className));
+
+            grp.append('text')
+                .attr('x', nodeW / 2).attr('y', 34)
+                .attr('text-anchor', 'middle')
+                .attr('fill', '#8b949e').attr('font-size', '9px')
+                .text(m.methodName || '');
+
+            if (isSource) {
+                grp.append('text').attr('x', nodeW / 2).attr('y', -6)
+                    .attr('text-anchor', 'middle').attr('fill', '#3fb950').attr('font-size', '10px')
+                    .attr('font-weight', '600').text('SOURCE');
+            }
+            if (isSink) {
+                grp.append('text').attr('x', nodeW / 2).attr('y', -6)
+                    .attr('text-anchor', 'middle').attr('fill', '#f85149').attr('font-size', '10px')
+                    .attr('font-weight', '600').text('SINK');
+            }
+        });
+
+        container.appendChild(flowDiv);
+
+        if (chain.taintText) {
+            var detail = document.createElement('div');
+            detail.className = 'taint-detail';
+            detail.textContent = chain.taintText || 'No taint analysis details available.';
+            container.appendChild(detail);
+        }
+    }
+
+    function animateParticle(svg, x1, y1, x2, y2, idx) {
+        var particle = svg.append('circle')
+            .attr('class', 'particle')
+            .attr('r', 3)
+            .attr('cx', x1).attr('cy', y1);
+
+        function loop() {
+            particle
+                .attr('cx', x1).attr('cy', y1).attr('opacity', 0.9)
+                .transition().duration(1200).ease(d3.easeLinear)
+                .attr('cx', x2).attr('cy', y2)
+                .transition().duration(200)
+                .attr('opacity', 0)
+                .on('end', loop);
+        }
+        setTimeout(loop, Math.random() * 1000);
+    }
+</script>
+</body>
+</html>
