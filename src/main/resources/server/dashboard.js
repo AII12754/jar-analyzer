@@ -1,6 +1,118 @@
 let dom = {};
 let buildPollTimer = 0;
 
+const SECURITY_PRESETS = [
+    {
+        id: 'runtime-exec',
+        shortTitle: 'Runtime.exec',
+        title: '命令执行 / Runtime.exec',
+        description: '从 Runtime.exec 反推上游调用链，优先排查命令注入与 RCE。',
+        sinkClass: 'java/lang/Runtime',
+        sinkMethod: 'exec',
+        sinkDesc: '(Ljava/lang/String;)Ljava/lang/Process;',
+        depth: 10,
+        limit: 10,
+        fromSink: true,
+        searchNullSource: true
+    },
+    {
+        id: 'processbuilder-start',
+        shortTitle: 'ProcessBuilder.start',
+        title: '命令执行 / ProcessBuilder.start',
+        description: '适合排查通过 ProcessBuilder 间接启动系统命令的路径。',
+        sinkClass: 'java/lang/ProcessBuilder',
+        sinkMethod: 'start',
+        sinkDesc: '()Ljava/lang/Process;',
+        depth: 10,
+        limit: 10,
+        fromSink: true,
+        searchNullSource: true
+    },
+    {
+        id: 'jndi-lookup',
+        shortTitle: 'JNDI lookup',
+        title: 'JNDI / lookup',
+        description: '结合外部可控名称时，常用于排查 JNDI 注入与远程命名服务访问。',
+        sinkClass: 'javax/naming/Context',
+        sinkMethod: 'lookup',
+        sinkDesc: '',
+        depth: 8,
+        limit: 8,
+        fromSink: true,
+        searchNullSource: true
+    },
+    {
+        id: 'deserialization',
+        shortTitle: 'readObject',
+        title: '反序列化 / readObject',
+        description: '命中 ObjectInputStream.readObject 的调用链，适合做反序列化入口审查。',
+        sinkClass: 'java/io/ObjectInputStream',
+        sinkMethod: 'readObject',
+        sinkDesc: '()Ljava/lang/Object;',
+        depth: 8,
+        limit: 8,
+        fromSink: true,
+        searchNullSource: true
+    },
+    {
+        id: 'script-eval',
+        shortTitle: 'ScriptEngine.eval',
+        title: '脚本执行 / ScriptEngine.eval',
+        description: '适合排查脚本注入、模板执行或 DSL 动态求值。',
+        sinkClass: 'javax/script/ScriptEngine',
+        sinkMethod: 'eval',
+        sinkDesc: '',
+        depth: 8,
+        limit: 8,
+        fromSink: true,
+        searchNullSource: true
+    },
+    {
+        id: 'ssrf-url',
+        shortTitle: 'URL.openConnection',
+        title: '网络出站 / URL.openConnection',
+        description: '适合把外部 URL 输入一路追到网络请求，验证 SSRF 风险。',
+        sinkClass: 'java/net/URL',
+        sinkMethod: 'openConnection',
+        sinkDesc: '()Ljava/net/URLConnection;',
+        depth: 8,
+        limit: 8,
+        fromSink: true,
+        searchNullSource: true
+    },
+    {
+        id: 'file-write',
+        shortTitle: 'FileOutputStream',
+        title: '文件写入 / FileOutputStream',
+        description: '适合排查路径穿越、任意文件写入和导出落地类问题。',
+        sinkClass: 'java/io/FileOutputStream',
+        sinkMethod: '<init>',
+        sinkDesc: '',
+        depth: 8,
+        limit: 8,
+        fromSink: true,
+        searchNullSource: true
+    },
+    {
+        id: 'reflection-invoke',
+        shortTitle: 'Method.invoke',
+        title: '反射调用 / Method.invoke',
+        description: '适合锁定动态执行面，再转入方法工作台查看真实调用图。',
+        sinkClass: 'java/lang/reflect/Method',
+        sinkMethod: 'invoke',
+        sinkDesc: '',
+        depth: 8,
+        limit: 8,
+        fromSink: true,
+        searchNullSource: true
+    }
+];
+
+const SECURITY_PRESET_MAP = SECURITY_PRESETS.reduce((result, preset) => {
+    result[preset.id] = preset;
+    return result;
+}, {});
+
 const state = {
     selectedMethod: null,
     reportMarkdown: '',
@@ -9,7 +121,11 @@ const state = {
     methodGraphHtml: '',
     taintGraphHtml: '',
     lastBuildFinishedAt: 0,
-    activePage: 'overview'
+    activePage: 'overview',
+    securityLoaded: false,
+    securityData: null,
+    securityActionRows: [],
+    securityEntryRows: []
 };
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -17,6 +133,8 @@ document.addEventListener('DOMContentLoaded', () => {
     bindEvents();
     restoreToken();
     renderSelectedMethod();
+    renderDfsPresetButtons();
+    renderSecurityPresetBoard();
     refreshReportStandaloneLink(false, '生成成功后，可从这里直接打开完整报告页面。');
     setFramePlaceholder(dom.methodGraphFrame, '方法调用图', '选中方法后，可直接在这里生成调用图。');
     setFramePlaceholder(dom.taintGraphFrame, '污点与 DFS 图', '执行 DFS 或点击“生成污点图”后，图结果会显示在这里。');
@@ -81,7 +199,7 @@ function cacheDom() {
         openMethodGraphBtn: document.getElementById('openMethodGraphBtn'),
         methodGraphMeta: document.getElementById('methodGraphMeta'),
         methodGraphFrame: document.getElementById('methodGraphFrame'),
-        fillRuntimePresetBtn: document.getElementById('fillRuntimePresetBtn'),
+        dfsPresetQuickList: document.getElementById('dfsPresetQuickList'),
         dfsForm: document.getElementById('dfsForm'),
         dfsSinkClass: document.getElementById('dfsSinkClass'),
         dfsSinkMethod: document.getElementById('dfsSinkMethod'),
@@ -99,6 +217,14 @@ function cacheDom() {
         openTaintGraphBtn: document.getElementById('openTaintGraphBtn'),
         taintGraphMeta: document.getElementById('taintGraphMeta'),
         taintGraphFrame: document.getElementById('taintGraphFrame'),
+        refreshSecurityBtn: document.getElementById('refreshSecurityBtn'),
+        goDfsFromSecurityBtn: document.getElementById('goDfsFromSecurityBtn'),
+        securitySummary: document.getElementById('securitySummary'),
+        securityPriorityBoard: document.getElementById('securityPriorityBoard'),
+        securityAssetBoard: document.getElementById('securityAssetBoard'),
+        securityHuntBoard: document.getElementById('securityHuntBoard'),
+        securityPresetBoard: document.getElementById('securityPresetBoard'),
+        securityEntryPoints: document.getElementById('securityEntryPoints'),
         reportEndpointInput: document.getElementById('reportEndpointInput'),
         reportModelInput: document.getElementById('reportModelInput'),
         reportApiKeyInput: document.getElementById('reportApiKeyInput'),
@@ -134,10 +260,16 @@ function bindEvents() {
     });
     dom.methodGraphBtn.addEventListener('click', loadMethodGraph);
     dom.openMethodGraphBtn.addEventListener('click', () => openHtmlWindow(state.methodGraphHtml, 'method-graph.html', '当前没有可打开的调用图。'));
-    dom.fillRuntimePresetBtn.addEventListener('click', fillRuntimePreset);
+    dom.dfsPresetQuickList.addEventListener('click', handlePresetBoardClick);
     dom.dfsForm.addEventListener('submit', runDfsAnalyze);
     dom.taintGraphBtn.addEventListener('click', () => loadTaintGraph(null, false));
     dom.openTaintGraphBtn.addEventListener('click', () => openHtmlWindow(state.taintGraphHtml, 'taint-graph.html', '当前没有可打开的污点图。'));
+    dom.refreshSecurityBtn.addEventListener('click', () => loadSecurityOverview(false));
+    dom.goDfsFromSecurityBtn.addEventListener('click', () => activatePage('dfs'));
+    dom.securityPriorityBoard.addEventListener('click', handleSecurityHuntClick);
+    dom.securityPresetBoard.addEventListener('click', handlePresetBoardClick);
+    dom.securityHuntBoard.addEventListener('click', handleSecurityHuntClick);
+    dom.securityEntryPoints.addEventListener('click', handleSecurityEntryClick);
     dom.reportAnalyzeBtn.addEventListener('click', () => runReport(true));
     dom.reportCacheBtn.addEventListener('click', () => runReport(false));
     window.addEventListener('hashchange', syncPageFromHash);
@@ -151,6 +283,7 @@ function syncPageFromHash() {
         'search-panel': 'search',
         'method-panel': 'method',
         'dfs-panel': 'dfs',
+        'security-panel': 'security',
         'report-panel': 'report'
     };
     const targetPage = pageAliases[rawHash] || rawHash || 'overview';
@@ -168,8 +301,16 @@ function activatePage(page, fromHash) {
         button.classList.toggle('nav-link-active', button.dataset.pageTarget === targetPage);
     });
 
+    maybeLoadPageData(targetPage);
+
     if (!fromHash) {
         window.history.replaceState(null, '', `#${targetPage}`);
+    }
+}
+
+function maybeLoadPageData(page) {
+    if (page === 'security' && !state.securityLoaded) {
+        loadSecurityOverview(true);
     }
 }
 
@@ -268,6 +409,9 @@ async function startBuild(event) {
         rt_jar_path: dom.buildRtJarPathInput.value.trim()
     };
 
+    state.securityLoaded = false;
+    state.securityData = null;
+
     setText(dom.buildStatusPill, '提交中');
     setBuildProgress(0, '正在提交浏览器构建任务...');
     renderBuildLogs(['正在提交浏览器构建任务...']);
@@ -344,8 +488,13 @@ function renderBuildStatus(data) {
     if (data.finished && data.finished_at && data.finished_at !== state.lastBuildFinishedAt) {
         state.lastBuildFinishedAt = data.finished_at;
         if (data.build_success) {
+            state.securityLoaded = false;
+            state.securityData = null;
             showNotice('success', '浏览器构建完成，分析引擎已刷新。');
             refreshStatus();
+            if (state.activePage === 'security') {
+                loadSecurityOverview(true);
+            }
         } else {
             showNotice('error', data.error_message || data.message || '构建失败。');
         }
@@ -546,21 +695,430 @@ function renderCodeResult(data) {
     `;
 }
 
+function renderDfsPresetButtons() {
+    if (!dom.dfsPresetQuickList) {
+        return;
+    }
+    dom.dfsPresetQuickList.innerHTML = SECURITY_PRESETS.slice(0, 6)
+        .map((preset, index) => `
+            <button class="btn ${index === 0 ? 'btn-secondary' : 'btn-ghost'}" data-dfs-preset="${escapeHtml(preset.id)}" type="button">${escapeHtml(preset.shortTitle)}</button>
+        `)
+        .join('');
+}
+
+function renderSecurityPresetBoard() {
+    if (!dom.securityPresetBoard) {
+        return;
+    }
+    dom.securityPresetBoard.innerHTML = SECURITY_PRESETS
+        .map((preset) => `
+            <article class="preset-card">
+                <div class="section-kicker">DFS Preset</div>
+                <h3>${escapeHtml(preset.title)}</h3>
+                <p>${escapeHtml(preset.description)}</p>
+                <div class="preset-meta">
+                    <span>${escapeHtml(formatClassName(preset.sinkClass))}</span>
+                    <span>${escapeHtml(preset.sinkMethod)}</span>
+                    <span>Depth ${escapeHtml(String(preset.depth))}</span>
+                </div>
+                <div class="security-actions">
+                    <button class="btn btn-secondary" data-dfs-preset="${escapeHtml(preset.id)}" type="button">套用到 DFS</button>
+                </div>
+            </article>
+        `)
+        .join('');
+}
+
+function handlePresetBoardClick(event) {
+    const button = event.target.closest('[data-dfs-preset]');
+    if (!button) {
+        return;
+    }
+    applyDfsPreset(button.dataset.dfsPreset);
+}
+
 function fillRuntimePreset() {
-    dom.dfsSinkClass.value = 'java/lang/Runtime';
-    dom.dfsSinkMethod.value = 'exec';
-    dom.dfsSinkDesc.value = '(Ljava/lang/String;)Ljava/lang/Process;';
+    applyDfsPreset('runtime-exec');
+}
+
+function applyDfsPreset(presetId) {
+    const preset = SECURITY_PRESET_MAP[presetId] || SECURITY_PRESET_MAP['runtime-exec'];
+    if (!preset) {
+        return;
+    }
+
+    dom.dfsSinkClass.value = preset.sinkClass;
+    dom.dfsSinkMethod.value = preset.sinkMethod;
+    dom.dfsSinkDesc.value = preset.sinkDesc || '';
     dom.dfsSourceClass.value = '';
     dom.dfsSourceMethod.value = '';
     dom.dfsSourceDesc.value = '';
-    dom.dfsDepth.value = '10';
-    dom.dfsLimit.value = '10';
-    dom.dfsFromSink.checked = true;
-    dom.dfsSearchNullSource.checked = true;
+    dom.dfsDepth.value = String(preset.depth || 10);
+    dom.dfsLimit.value = String(preset.limit || 10);
+    dom.dfsFromSink.checked = preset.fromSink !== false;
+    dom.dfsSearchNullSource.checked = preset.searchNullSource !== false;
     state.taintGraphHtml = '';
-    dom.taintGraphMeta.textContent = '已填充 Runtime.exec 预设，可重新生成污点图。';
-    setFramePlaceholder(dom.taintGraphFrame, '污点与 DFS 图', '预设已填充，点击“生成污点图”查看图形结果。');
-    showNotice('info', '已填充 Runtime.exec 预设。');
+    dom.taintGraphMeta.textContent = `已填充 ${preset.title} 预设，可重新生成污点图。`;
+    setFramePlaceholder(dom.taintGraphFrame, '污点与 DFS 图', `已填充 ${preset.title} 预设，点击“执行 DFS”或“生成污点图”继续分析。`);
+    activatePage('dfs');
+    showNotice('info', `已填充 ${preset.title} 预设。`);
+}
+
+async function loadSecurityOverview(silent) {
+    if (!dom.securitySummary) {
+        return;
+    }
+    renderSecurityLoading('正在聚合入口资产与危险调用者...');
+    try {
+        const data = await apiRequest('/api/security_overview');
+        if (!data || data.success === false) {
+            throw new Error(data && data.message ? data.message : '安全巡航生成失败。');
+        }
+        state.securityLoaded = true;
+        state.securityData = data;
+        renderSecurityOverview(data);
+        if (!silent) {
+            showNotice('success', '安全巡航结果已刷新。');
+        }
+    } catch (error) {
+        state.securityLoaded = false;
+        state.securityData = null;
+        renderSecurityError(error);
+        if (!silent) {
+            showNotice(error.requiresToken ? 'warning' : 'error', buildFriendlyError(error));
+        }
+    }
+}
+
+function renderSecurityLoading(message) {
+    const summary = [
+        {label: 'Web 入口资产', value: '--', meta: message},
+        {label: 'Spring 路由', value: '--', meta: '等待聚合'},
+        {label: '命中风险类别', value: '--', meta: '等待聚合'},
+        {label: '风险得分', value: '--', meta: '等待聚合'}
+    ];
+    dom.securitySummary.innerHTML = summary.map((item) => buildSecuritySummaryCard(item)).join('');
+    renderEmpty(dom.securityPriorityBoard, message);
+    renderEmpty(dom.securityAssetBoard, message);
+    renderEmpty(dom.securityHuntBoard, message);
+    renderEmpty(dom.securityEntryPoints, message);
+}
+
+function renderSecurityError(error) {
+    const message = buildFriendlyError(error);
+    const summary = [
+        {label: 'Web 入口资产', value: 'Error', meta: message},
+        {label: 'Spring 路由', value: 'Error', meta: '请检查引擎状态'},
+        {label: '命中风险类别', value: 'Error', meta: '请检查鉴权或索引'},
+        {label: '风险得分', value: 'Error', meta: '请稍后重试'}
+    ];
+    dom.securitySummary.innerHTML = summary.map((item) => buildSecuritySummaryCard(item)).join('');
+    renderError(dom.securityPriorityBoard, error);
+    renderError(dom.securityAssetBoard, error);
+    renderError(dom.securityHuntBoard, error);
+    renderError(dom.securityEntryPoints, error);
+}
+
+function renderSecurityOverview(data) {
+    const summary = resolveSecuritySummary(data);
+    renderSecuritySummary(summary);
+    renderSecurityPriorities(Array.isArray(data.hunts) ? data.hunts : []);
+    renderSecurityAssets(data.assets || {}, summary);
+    renderSecurityHunts(Array.isArray(data.hunts) ? data.hunts : []);
+    renderSecurityEntryPoints((data.assets && Array.isArray(data.assets.mappings)) ? data.assets.mappings : []);
+}
+
+function renderSecuritySummary(summary) {
+    const cards = [
+        {label: 'Web 入口资产', value: String(summary.entrypointCount), meta: `Controller / Servlet / Filter / Listener 共 ${summary.entrypointCount} 个`},
+        {label: 'Spring 路由', value: String(summary.mappingCount), meta: '已提取到的 HTTP 路径映射数量'},
+        {label: '命中风险类别', value: String(summary.positiveHuntCount), meta: `共发现 ${summary.totalFindingCount} 条待排查线索`},
+        {label: '风险得分', value: String(summary.riskScore), meta: `${summary.highPriorityCount} 条高优先级线索需要优先核查`}
+    ];
+    dom.securitySummary.innerHTML = cards.map((item) => buildSecuritySummaryCard(item)).join('');
+}
+
+function buildSecuritySummaryCard(item) {
+    return `
+        <article class="security-summary-card">
+            <span class="metric-label">${escapeHtml(item.label)}</span>
+            <strong>${escapeHtml(item.value)}</strong>
+            <span>${escapeHtml(item.meta)}</span>
+        </article>
+    `;
+}
+
+function renderSecurityPriorities(hunts) {
+    const positive = hunts
+        .filter((item) => Number(item.callerCount || 0) > 0)
+        .sort((left, right) => {
+            const scoreDiff = scoreHuntSeverity(right.severity) - scoreHuntSeverity(left.severity);
+            if (scoreDiff !== 0) {
+                return scoreDiff;
+            }
+            return Number(right.callerCount || 0) - Number(left.callerCount || 0);
+        });
+
+    if (positive.length === 0) {
+        renderEmpty(dom.securityPriorityBoard, '当前没有命中内置危险 Sink。可以先导入样本或手动在方法检索页搜索。');
+        return;
+    }
+
+    const maxCount = Math.max.apply(null, positive.map((item) => Number(item.callerCount || 0)));
+    dom.securityPriorityBoard.innerHTML = `
+        <div class="priority-stack">
+            ${positive.map((item) => {
+                const width = maxCount > 0 ? Math.max(8, Math.round((Number(item.callerCount || 0) / maxCount) * 100)) : 0;
+                return `
+                    <div class="priority-row">
+                        <div class="priority-head">
+                            <div>
+                                <strong>${escapeHtml(item.title || '')}</strong>
+                                <span>${escapeHtml(item.summary || '')}</span>
+                            </div>
+                            <span class="severity-badge ${resolveSeverityClass(item.severity)}">${escapeHtml(resolveSeverityLabel(item.severity))}</span>
+                        </div>
+                        <div class="priority-meter"><span style="width: ${width}%"></span></div>
+                        <div class="security-actions">
+                            <span class="tiny-note">命中 ${escapeHtml(String(item.callerCount || 0))} 条</span>
+                            <button class="mini-btn" data-security-preset="${escapeHtml(item.presetId || '')}" type="button">DFS 预设</button>
+                        </div>
+                    </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+}
+
+function renderSecurityAssets(assets, summary) {
+    const groups = [
+        {title: 'Spring Controllers', count: safeLength(assets.controllers), items: assets.controllers},
+        {title: 'Servlets', count: safeLength(assets.servlets), items: assets.servlets},
+        {title: 'Filters', count: safeLength(assets.filters), items: assets.filters},
+        {title: 'Listeners', count: safeLength(assets.listeners), items: assets.listeners}
+    ];
+    dom.securityAssetBoard.innerHTML = `
+        <div class="asset-grid">
+            ${groups.map((group) => `
+                <article class="asset-card">
+                    <div class="asset-card-head">
+                        <strong>${escapeHtml(group.title)}</strong>
+                        <span>${escapeHtml(String(group.count))} 个</span>
+                    </div>
+                    <div class="asset-tags">
+                        ${topAssetNames(group.items).map((item) => `<span>${escapeHtml(item)}</span>`).join('') || '<span>未发现</span>'}
+                    </div>
+                </article>
+            `).join('')}
+        </div>
+        <p class="entrypoint-note">当前共识别 ${escapeHtml(String(summary.entrypointCount))} 个 Web 入口资产，Spring 路由 ${escapeHtml(String(summary.mappingCount))} 条。</p>
+    `;
+}
+
+function renderSecurityHunts(hunts) {
+    state.securityActionRows = [];
+    if (!hunts || hunts.length === 0) {
+        renderEmpty(dom.securityHuntBoard, '当前没有可展示的内置漏洞排查结果。');
+        return;
+    }
+    dom.securityHuntBoard.innerHTML = `
+        <div class="hunt-stack">
+            ${hunts.map((hunt) => {
+                const findings = Array.isArray(hunt.findings) ? hunt.findings : [];
+                const preview = findings.slice(0, 5).map((row) => {
+                    const index = state.securityActionRows.push(Object.assign({presetId: hunt.presetId}, row)) - 1;
+                    return `
+                        <div class="security-finding">
+                            <div class="security-finding-top">
+                                <div class="security-finding-main">
+                                    <strong>${escapeHtml(formatClassName(row.className || ''))}</strong>
+                                    <code>${escapeHtml(`${row.methodName || ''} ${row.methodDesc || ''}`)}</code>
+                                </div>
+                                <span class="tiny-note">${escapeHtml(row.matchedSink || '')}</span>
+                            </div>
+                            <div class="security-actions">
+                                <button class="mini-btn" data-security-select-index="${index}" type="button">送入工作台</button>
+                                <button class="mini-btn" data-security-graph-index="${index}" type="button">调用图</button>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+                return `
+                    <article class="hunt-card">
+                        <div class="hunt-head">
+                            <div>
+                                <strong>${escapeHtml(hunt.title || '')}</strong>
+                                <span>${escapeHtml(hunt.summary || '')}</span>
+                            </div>
+                            <span class="severity-badge ${resolveSeverityClass(hunt.severity)}">${escapeHtml(resolveSeverityLabel(hunt.severity))}</span>
+                        </div>
+                        <div class="security-actions">
+                            <span class="tiny-note">命中 ${escapeHtml(String(hunt.callerCount || 0))} 条</span>
+                            <button class="mini-btn" data-security-preset="${escapeHtml(hunt.presetId || '')}" type="button">套用 DFS 预设</button>
+                        </div>
+                        ${findings.length > 0
+                            ? `<div class="hunt-list">${preview}</div>${findings.length > 5 ? `<div class="tiny-note">其余 ${escapeHtml(String(findings.length - 5))} 条可以继续在方法检索或方法工作台中展开。</div>` : ''}`
+                            : '<div class="result-empty">当前未命中。</div>'}
+                    </article>
+                `;
+            }).join('')}
+        </div>
+    `;
+}
+
+function handleSecurityHuntClick(event) {
+    const presetButton = event.target.closest('[data-security-preset]');
+    if (presetButton) {
+        applyDfsPreset(presetButton.dataset.securityPreset);
+        return;
+    }
+
+    const selectButton = event.target.closest('[data-security-select-index]');
+    if (selectButton) {
+        const row = state.securityActionRows[Number(selectButton.dataset.securitySelectIndex)];
+        if (row) {
+            setSelectedMethod(row);
+            activatePage('method');
+            showNotice('info', '已将安全线索方法送入工作台。');
+        }
+        return;
+    }
+
+    const graphButton = event.target.closest('[data-security-graph-index]');
+    if (graphButton) {
+        const row = state.securityActionRows[Number(graphButton.dataset.securityGraphIndex)];
+        if (row) {
+            setSelectedMethod(row);
+            activatePage('method');
+            loadMethodGraph();
+            showNotice('info', '已根据安全线索生成调用图。');
+        }
+    }
+}
+
+function renderSecurityEntryPoints(mappings) {
+    state.securityEntryRows = Array.isArray(mappings) ? mappings : [];
+    if (!state.securityEntryRows.length) {
+        renderEmpty(dom.securityEntryPoints, '当前没有提取到 Spring 入口映射。');
+        return;
+    }
+    const displayRows = state.securityEntryRows.slice(0, 18);
+    dom.securityEntryPoints.innerHTML = `
+        <div class="entrypoint-stack">
+            ${displayRows.map((row, index) => `
+                <div class="entrypoint-row">
+                    <div>
+                        <div class="entrypoint-path">${escapeHtml((row.restfulType || 'REQUEST') + ' ' + (row.actualPath || '/'))}</div>
+                        <div class="tiny-note">Spring MVC 入口</div>
+                    </div>
+                    <div class="entrypoint-main">
+                        <strong>${escapeHtml(formatClassName(row.className || ''))}</strong>
+                        <div class="entrypoint-code">${escapeHtml(`${row.methodName || ''} ${row.methodDesc || ''}`)}</div>
+                    </div>
+                    <div class="entrypoint-actions">
+                        <button class="mini-btn" data-security-entry-select-index="${index}" type="button">送入工作台</button>
+                        <button class="mini-btn" data-security-entry-graph-index="${index}" type="button">调用图</button>
+                    </div>
+                </div>
+            `).join('')}
+            ${state.securityEntryRows.length > displayRows.length
+                ? `<div class="tiny-note">当前仅展示前 ${escapeHtml(String(displayRows.length))} 条入口映射，完整结果建议结合方法检索页继续展开。</div>`
+                : ''}
+        </div>
+    `;
+}
+
+function handleSecurityEntryClick(event) {
+    const selectButton = event.target.closest('[data-security-entry-select-index]');
+    if (selectButton) {
+        const row = state.securityEntryRows[Number(selectButton.dataset.securityEntrySelectIndex)];
+        if (row) {
+            setSelectedMethod(row);
+            activatePage('method');
+            showNotice('info', '已将入口方法送入工作台。');
+        }
+        return;
+    }
+
+    const graphButton = event.target.closest('[data-security-entry-graph-index]');
+    if (graphButton) {
+        const row = state.securityEntryRows[Number(graphButton.dataset.securityEntryGraphIndex)];
+        if (row) {
+            setSelectedMethod(row);
+            activatePage('method');
+            loadMethodGraph();
+            showNotice('info', '已根据入口方法生成调用图。');
+        }
+    }
+}
+
+function resolveSecuritySummary(data) {
+    const assets = data && data.assets ? data.assets : {};
+    const hunts = Array.isArray(data && data.hunts) ? data.hunts : [];
+    const entrypointCount = safeLength(assets.controllers)
+        + safeLength(assets.servlets)
+        + safeLength(assets.filters)
+        + safeLength(assets.listeners);
+    const mappingCount = safeLength(assets.mappings);
+    const positive = hunts.filter((item) => Number(item.callerCount || 0) > 0);
+    const totalFindingCount = positive.reduce((sum, item) => sum + Number(item.callerCount || 0), 0);
+    const highPriorityCount = positive
+        .filter((item) => scoreHuntSeverity(item.severity) >= 3)
+        .reduce((sum, item) => sum + Number(item.callerCount || 0), 0);
+    const riskScore = Math.min(100, entrypointCount * 2 + mappingCount + positive.reduce((sum, item) => {
+        return sum + Math.min(Number(item.callerCount || 0), 8) * scoreHuntSeverity(item.severity);
+    }, 0));
+    return {
+        entrypointCount,
+        mappingCount,
+        positiveHuntCount: positive.length,
+        totalFindingCount,
+        highPriorityCount,
+        riskScore
+    };
+}
+
+function resolveSeverityClass(severity) {
+    const normalized = String(severity || '').toLowerCase();
+    if (normalized === 'critical') {
+        return 'severity-critical';
+    }
+    if (normalized === 'high') {
+        return 'severity-high';
+    }
+    return 'severity-medium';
+}
+
+function resolveSeverityLabel(severity) {
+    const normalized = String(severity || '').toLowerCase();
+    if (normalized === 'critical') {
+        return '严重';
+    }
+    if (normalized === 'high') {
+        return '高危';
+    }
+    return '中危';
+}
+
+function scoreHuntSeverity(severity) {
+    const normalized = String(severity || '').toLowerCase();
+    if (normalized === 'critical') {
+        return 4;
+    }
+    if (normalized === 'high') {
+        return 3;
+    }
+    return 2;
+}
+
+function topAssetNames(items) {
+    return (Array.isArray(items) ? items : [])
+        .slice(0, 5)
+        .map((item) => shortClassName(item.className || ''));
+}
+
+function safeLength(value) {
+    return Array.isArray(value) ? value.length : 0;
 }
 
 async function runDfsAnalyze(event) {
@@ -1027,6 +1585,16 @@ function formatCell(value) {
         return JSON.stringify(value);
     }
     return String(value);
+}
+
+function formatClassName(value) {
+    return String(value || '').replace(/\//g, '.');
+}
+
+function shortClassName(value) {
+    const text = formatClassName(value);
+    const parts = text.split('.');
+    return parts[parts.length - 1] || text;
 }
 
 function clampProgress(value) {

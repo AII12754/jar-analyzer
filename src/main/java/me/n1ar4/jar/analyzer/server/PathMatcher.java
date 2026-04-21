@@ -68,6 +68,7 @@ public class PathMatcher {
 
         handlers.put("/api/get_all_spring_controllers", new GetAllSpringControllersHandler());
         handlers.put("/api/get_spring_mappings", new GetSpringMappingsHandler());
+        handlers.put("/api/security_overview", new GetSecurityOverviewHandler());
 
         handlers.put("/api/get_all_servlets", new GetAllServletsHandler());
 

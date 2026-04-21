@@ -28,7 +28,7 @@
             <div>
                 <h1>Jar Analyzer 浏览器工作台</h1>
                 <p class="hero-copy">
-                    现在可以直接在浏览器里上传 JAR/WAR、构建数据库、查看调用图与污点路径，并继续完成查询、DFS、代码查看和 LLM 审计报告生成。
+                    现在可以直接在浏览器里上传 JAR/WAR、建立分析索引、查看调用图与污点路径，并继续完成安全巡航、漏洞排查、代码查看和 LLM 审计报告生成。
                 </p>
             </div>
             <div class="hero-actions">
@@ -74,6 +74,7 @@
                     <button class="nav-link" data-page-target="search" type="button">方法检索</button>
                     <button class="nav-link" data-page-target="method" type="button">方法工作台</button>
                     <button class="nav-link" data-page-target="dfs" type="button">DFS 分析</button>
+                    <button class="nav-link" data-page-target="security" type="button">安全巡航</button>
                     <button class="nav-link" data-page-target="report" type="button">LLM 报告</button>
                 </nav>
             </section>
@@ -291,8 +292,11 @@
                         <div class="section-kicker">Graph Search</div>
                         <h2>DFS 分析面板</h2>
                     </div>
-                    <button id="fillRuntimePresetBtn" class="btn btn-ghost" type="button">填充 Runtime.exec 预设</button>
+                    <div id="dfsPresetQuickList" class="chip-actions"></div>
                 </div>
+                <p class="section-copy">
+                    内置预设覆盖命令执行、JNDI、反序列化、脚本执行、SSRF 和文件写入场景。先用安全巡航筛入口，再回到这里做定向 DFS 和污点图验证。
+                </p>
 
                 <form id="dfsForm" class="tool-form stacked-form">
                     <div class="triple-grid">
@@ -360,6 +364,49 @@
                 <div class="report-view">
                     <iframe id="taintGraphFrame" class="graph-frame" title="污点与 DFS 图"></iframe>
                 </div>
+            </section>
+
+            <section id="security-panel" class="panel section-panel workspace-page" data-page="security">
+                <div class="section-head">
+                    <div>
+                        <div class="section-kicker">Security Cruise</div>
+                        <h2>安全巡航与漏洞排查</h2>
+                    </div>
+                    <div class="chip-actions">
+                        <button id="refreshSecurityBtn" class="btn btn-primary" type="button">刷新巡航</button>
+                        <button id="goDfsFromSecurityBtn" class="btn btn-ghost" type="button">打开 DFS 面板</button>
+                    </div>
+                </div>
+                <p class="section-copy">
+                    这里把 Web 入口资产、危险 Sink 调用者、快速排查线索和 DFS 预设汇总到一个页面里，适合先做全局筛查，再进入方法工作台或污点图深挖。
+                </p>
+
+                <div id="securitySummary" class="security-summary-grid"></div>
+
+                <div class="dual-form-grid security-grid">
+                    <div class="security-block">
+                        <div class="result-meta">优先排查方向</div>
+                        <div id="securityPriorityBoard" class="security-board">等待巡航结果。</div>
+                    </div>
+                    <div class="security-block">
+                        <div class="result-meta">入口资产概览</div>
+                        <div id="securityAssetBoard" class="security-board">等待巡航结果。</div>
+                    </div>
+                </div>
+
+                <div class="dual-form-grid security-grid">
+                    <div class="security-block">
+                        <div class="result-meta">内置漏洞排查</div>
+                        <div id="securityHuntBoard" class="security-board">等待巡航结果。</div>
+                    </div>
+                    <div class="security-block">
+                        <div class="result-meta">DFS 快速预设</div>
+                        <div id="securityPresetBoard" class="preset-grid"></div>
+                    </div>
+                </div>
+
+                <div class="result-meta">Spring 入口映射</div>
+                <div id="securityEntryPoints" class="result-surface">等待巡航结果。</div>
             </section>
 
             <section id="report-panel" class="panel section-panel report-panel workspace-page" data-page="report">
