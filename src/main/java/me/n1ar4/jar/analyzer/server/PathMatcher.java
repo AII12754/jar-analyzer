@@ -31,8 +31,18 @@ public class PathMatcher {
         handlers.put("/index.jsp", handler);
         handlers.put("/favicon.ico", new FaviconHandler());
         handlers.put("/static/boot.js", new JSHandler());
+        handlers.put("/static/dashboard.js", new JSHandler());
         handlers.put("/static/d3v6.js", new D3Handler());
         handlers.put("/static/boot.css", new CSSHandler());
+        handlers.put("/static/dashboard.css", new CSSHandler());
+        handlers.put("/report/latest", new GetLatestAuditReportPageHandler());
+        handlers.put("/report/latest.html", new GetLatestAuditReportPageHandler());
+
+        handlers.put("/api/server_status", new GetServerStatusHandler());
+        handlers.put("/api/generate_audit_report", new GenerateAuditReportHandler());
+        handlers.put("/api/start_project_build", new StartProjectBuildHandler());
+        handlers.put("/api/build_status", new GetBuildStatusHandler());
+        handlers.put("/api/method_graph", new MethodGraphHandler());
 
         handlers.put("/api/get_jars_list", new GetJarListHandler());
         handlers.put("/api/get_jar_by_class", new GetJarByClassHandler());
@@ -87,10 +97,14 @@ public class PathMatcher {
                         "<h2>NEED TOKEN HEADER</h2>");
     }
 
+    private boolean requiresAuth(String uri) {
+        return config.isAuth() && uri != null && uri.startsWith("/api/");
+    }
+
     public NanoHTTPD.Response handleReq(NanoHTTPD.IHTTPSession session) {
         String uri = session.getUri();
 
-        if (config.isAuth()) {
+        if (requiresAuth(uri)) {
             // 这个框架有 BUG 大小写问题
             String authA = session.getHeaders().get("Token");
             String authB = session.getHeaders().get("token");

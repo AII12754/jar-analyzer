@@ -100,6 +100,7 @@
         <java.parser.version>3.28.0</java.parser.version>
         <snakeyaml.version>2.6</snakeyaml.version>
         <csv.version>1.14.1</csv.version>
+        <commonmark.version>0.24.0</commonmark.version>
         <junit.version>5.14.3</junit.version>
         <compress.version>1.28.0</compress.version>
         <cfr.version>0.152</cfr.version>
@@ -236,6 +237,16 @@
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-csv</artifactId>
             <version>${csv.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.commonmark</groupId>
+            <artifactId>commonmark</artifactId>
+            <version>${commonmark.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.commonmark</groupId>
+            <artifactId>commonmark-ext-gfm-tables</artifactId>
+            <version>${commonmark.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.commons</groupId>

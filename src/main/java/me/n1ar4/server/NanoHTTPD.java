@@ -70,9 +70,15 @@ public abstract class NanoHTTPD {
              InputStream in = s.getInputStream();
              OutputStream out = s.getOutputStream()) {
 
-            BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.ISO_8859_1));
-            String requestLine = reader.readLine();
-            if (requestLine == null || requestLine.isEmpty()) {
+            byte[] headerBytes = readHeaderBytes(in);
+            if (headerBytes.length == 0) {
+                return;
+            }
+
+            String headerText = new String(headerBytes, StandardCharsets.ISO_8859_1);
+            String[] headerLines = headerText.split("\\r\\n");
+            String requestLine = headerLines.length > 0 ? headerLines[0] : "";
+            if (requestLine.isEmpty()) {
                 return;
             }
 
@@ -88,9 +94,11 @@ public abstract class NanoHTTPD {
             }
 
             Map<String, String> headers = new LinkedHashMap<>();
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (line.isEmpty()) break;
+            for (int i = 1; i < headerLines.length; i++) {
+                String line = headerLines[i];
+                if (line.isEmpty()) {
+                    continue;
+                }
                 int idx = line.indexOf(':');
                 if (idx > 0) {
                     String key = line.substring(0, idx).trim();
@@ -133,7 +141,7 @@ public abstract class NanoHTTPD {
 
             HTTPSession session = new HTTPSession(uri, method, headers, parameters,
                     s.getInetAddress() != null ? s.getInetAddress().getHostAddress() : "127.0.0.1",
-                    in);
+            new ByteArrayInputStream(body));
 
             Response resp = serve(session);
             if (resp == null) {
@@ -142,6 +150,26 @@ public abstract class NanoHTTPD {
             writeResponse(out, resp);
         } catch (IOException ignored) {
         }
+    }
+
+    private byte[] readHeaderBytes(InputStream in) throws IOException {
+        ByteArrayOutputStream bos = new ByteArrayOutputStream();
+        int matched = 0;
+        int current;
+        while ((current = in.read()) != -1) {
+            bos.write(current);
+            if ((matched == 0 || matched == 2) && current == '\r') {
+                matched++;
+            } else if ((matched == 1 || matched == 3) && current == '\n') {
+                matched++;
+                if (matched == 4) {
+                    break;
+                }
+            } else {
+                matched = current == '\r' ? 1 : 0;
+            }
+        }
+        return bos.toByteArray();
     }
 
     private void decodeParams(String qs, Map<String, List<String>> parameters) {

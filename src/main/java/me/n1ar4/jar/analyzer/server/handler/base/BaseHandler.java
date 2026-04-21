@@ -18,6 +18,8 @@ import me.n1ar4.log.Logger;
 import me.n1ar4.server.NanoHTTPD;
 import org.objectweb.asm.Type;
 
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -60,6 +62,53 @@ public class BaseHandler {
             return "";
         }
         return d.get(0);
+    }
+
+    protected String getParam(NanoHTTPD.IHTTPSession session, String name) {
+        return getParam(session, name, "");
+    }
+
+    protected String getParam(NanoHTTPD.IHTTPSession session, String name, String defaultValue) {
+        List<String> params = session.getParameters().get(name);
+        if (params == null || params.isEmpty()) {
+            return defaultValue;
+        }
+        String value = params.get(0);
+        if (value == null) {
+            return defaultValue;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? defaultValue : trimmed;
+    }
+
+    protected String getHeader(NanoHTTPD.IHTTPSession session, String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return "";
+        }
+        for (java.util.Map.Entry<String, String> entry : session.getHeaders().entrySet()) {
+            if (entry.getKey() != null && entry.getKey().equalsIgnoreCase(name)) {
+                return entry.getValue() == null ? "" : entry.getValue();
+            }
+        }
+        return "";
+    }
+
+    protected byte[] readBodyBytes(NanoHTTPD.IHTTPSession session) {
+        try {
+            InputStream inputStream = session.getInputStream();
+            if (inputStream == null) {
+                return new byte[0];
+            }
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            byte[] buffer = new byte[8192];
+            int len;
+            while ((len = inputStream.read(buffer)) != -1) {
+                bos.write(buffer, 0, len);
+            }
+            return bos.toByteArray();
+        } catch (Exception ignored) {
+            return new byte[0];
+        }
     }
 
     private static void addCorsHeaders(NanoHTTPD.Response response) {

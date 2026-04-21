@@ -50,6 +50,26 @@ public class CoreRunner {
 
     private static boolean quickMode = false;
 
+    public static void runBrowser(Path jarPath,
+                                  Path rtJarPath,
+                                  boolean fixClass,
+                                  boolean enableQuickMode) {
+        boolean oldCli = AnalyzeEnv.isCli;
+        boolean oldQuickMode = quickMode;
+        try {
+            AnalyzeEnv.isCli = true;
+            quickMode = enableQuickMode;
+            if (MainForm.getInstance() != null) {
+                MainForm.getInstance().getFileText().setText(jarPath.toAbsolutePath().toString());
+                MainForm.getInstance().getBuildBar().setValue(0);
+            }
+            run(jarPath, rtJarPath, fixClass, null);
+        } finally {
+            AnalyzeEnv.isCli = oldCli;
+            quickMode = oldQuickMode;
+        }
+    }
+
     public static void run(Path jarPath, Path rtJarPath, boolean fixClass, JDialog dialog) {
         // Clear corrupted files tracking at the start of each analysis
         AnalyzeEnv.corruptedFiles.clear();
@@ -342,6 +362,7 @@ public class CoreRunner {
         config.setDbSize(fileSizeMB);
         config.setLang("en");
         MainForm.setConfig(config);
+        BytecodeCallGraph.reset();
         MainForm.setEngine(new CoreEngine(config));
 
         if (MainForm.getInstance().getAutoSaveCheckBox().isSelected()) {
@@ -380,7 +401,7 @@ public class CoreRunner {
         CoreHelper.refreshLiteners();
 
         // Show popup notification if there are corrupted files with StackMapTable issues
-        if (!AnalyzeEnv.corruptedFiles.isEmpty()) {
+        if (!AnalyzeEnv.isCli && !AnalyzeEnv.corruptedFiles.isEmpty()) {
             StringBuilder sb = new StringBuilder();
             sb.append("<html><body>");
             sb.append("<h3>以下文件存在 StackMapTable 损坏问题（已使用 SKIP_FRAMES 模式解析）：</h3>");

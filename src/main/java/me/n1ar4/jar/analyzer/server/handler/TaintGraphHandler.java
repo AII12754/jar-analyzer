@@ -112,12 +112,4 @@ public class TaintGraphHandler extends BaseHandler implements HttpHandler {
             return errorMsg(ex.getMessage());
         }
     }
-
-    private String getParam(NanoHTTPD.IHTTPSession session, String name) {
-        List<String> p = session.getParameters().get(name);
-        if (p == null || p.isEmpty()) {
-            return "";
-        }
-        return p.get(0);
-    }
 }

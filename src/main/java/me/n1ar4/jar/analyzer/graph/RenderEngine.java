@@ -33,9 +33,9 @@ public class RenderEngine {
         return s.replace("\\", "\\\\").replace("'", "\\'");
     }
 
-    public static String processGraph(MethodResult cur,
-                                      List<MethodResult> caller,
-                                      List<MethodResult> callee) {
+    public static String renderHtml(MethodResult cur,
+                                    List<MethodResult> caller,
+                                    List<MethodResult> callee) {
         methodIdStringMap.clear();
         MethodData data = new MethodData();
         String curId = generateId();
@@ -89,10 +89,17 @@ public class RenderEngine {
         graphData.setNodes(nodesBuffer.toString());
         graphData.setLinks(linksBuffer.toString());
 
-        String html = HtmlGraphUtil.render(graphData);
+        return HtmlGraphUtil.render(graphData);
+    }
+
+    public static String processGraph(MethodResult cur,
+                                      List<MethodResult> caller,
+                                      List<MethodResult> callee) {
+        String html = renderHtml(cur, caller, callee);
         if (html == null) {
             return null;
         }
+
         try {
             String fileName = String.format("jar-analyzer-graph-%d.html", System.currentTimeMillis());
             Files.write(Paths.get(fileName), html.getBytes());

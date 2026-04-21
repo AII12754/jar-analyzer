@@ -10,6 +10,7 @@
 
 package me.n1ar4.jar.analyzer.gadget;
 
+import com.intellij.uiDesigner.core.GridConstraints;
 import me.n1ar4.jar.analyzer.gui.MainForm;
 import me.n1ar4.jar.analyzer.gui.util.SvgManager;
 
@@ -99,5 +100,18 @@ public class GadgetUIBuilder {
         });
 
         GadgetRule.build();
+
+        // 自动利用链挖掘入口按钮（挂在 gadgetOpPanel 同行右侧位置）
+        JButton autoChainBtn = new JButton("自动利用链挖掘（实验性）");
+        autoChainBtn.setToolTipText("对已加载 JAR 执行反序列化利用链自动挖掘，需先完成 JAR 分析");
+        autoChainBtn.addActionListener(e ->
+                me.n1ar4.jar.analyzer.gadget.auto.SerChainPanel.openDialog());
+        form.getGadgetOpPanel().add(autoChainBtn, new GridConstraints(
+            0, 5, 1, 1,
+            GridConstraints.ANCHOR_CENTER,
+            GridConstraints.FILL_HORIZONTAL,
+            GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW,
+            GridConstraints.SIZEPOLICY_FIXED,
+            null, null, null, 0, false));
     }
 }

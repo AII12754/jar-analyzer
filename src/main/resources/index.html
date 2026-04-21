@@ -13,133 +13,402 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jar Analyzer API</title>
-    <link href="/static/boot.css" rel="stylesheet">
+    <title>Jar Analyzer Web Console</title>
+    <link rel="icon" href="/favicon.ico">
+    <link rel="stylesheet" href="/static/dashboard.css">
 </head>
 <body>
-<div class="container">
-    <h1 class="mt-5 mb-4">Jar Analyzer API</h1>
-    <p>现在 Jar Analyzer 分析完成后提供 HTTP API 方式进行查询。</p>
-    <p>默认绑定 0.0.0.0:10032 你可以通过 gui --port [port] 指定参数。</p>
+<div class="page-shell">
+    <div class="ambient ambient-a"></div>
+    <div class="ambient ambient-b"></div>
 
-    <h2 class="mt-5">API 列表</h2>
-    <table class="table table-striped">
-        <thead>
-        <tr>
-            <th>API</th>
-            <th>参数</th>
-            <th>功能</th>
-        </tr>
-        </thead>
-        <tbody>
-        <tr>
-            <td>/api/get_jars_list</td>
-            <td>/</td>
-            <td>查询所有输入的 JAR 文件</td>
-        </tr>
-        <tr>
-            <td>/api/get_jar_by_class</td>
-            <td>class=${class-name}</td>
-            <td>根据输入的完整类名查询归属 JAR 文件</td>
-        </tr>
-        <tr>
-            <td>/api/get_callers</td>
-            <td>class=${class-name}&method=${method}&desc=${desc}</td>
-            <td>根据方法信息找到所有调用者</td>
-        </tr>
-        <tr>
-            <td>/api/get_callers_like</td>
-            <td>class=${class-name}&method=${method}&desc=${desc}</td>
-            <td>根据方法信息模糊找到所有调用者</td>
-        </tr>
-        <tr>
-            <td>/api/get_callee</td>
-            <td>class=${class-name}&method=${method}&desc=${desc}</td>
-            <td>根据方法信息找到所有被调用者</td>
-        </tr>
-        <tr>
-            <td>/api/get_method</td>
-            <td>class=${class-name}&method=${method}&desc=${desc}</td>
-            <td>根据方法信息查询具体方法信息</td>
-        </tr>
-        <tr>
-            <td>/api/get_method_like</td>
-            <td>class=${class-name}&method=${method}&desc=${desc}</td>
-            <td>根据方法信息模糊查找方法信息</td>
-        </tr>
-        <tr>
-            <td>/api/get_methods_by_str</td>
-            <td>str=${str}</td>
-            <td>查询包含指定字符串的方法信息</td>
-        </tr>
-        <tr>
-            <td>/api/get_methods_by_class</td>
-            <td>class=${class-name}</td>
-            <td>查询 CLASS 中的所有方法</td>
-        </tr>
-        <tr>
-            <td>/api/get_impls</td>
-            <td>class=${class-name}&method=${method}&desc=${desc}</td>
-            <td>查询方法的所有子类和实现</td>
-        </tr>
-        <tr>
-            <td>/api/get_super_impls</td>
-            <td>class=${class-name}&method=${method}&desc=${desc}</td>
-            <td>查询方法的所有父类和接口</td>
-        </tr>
-        <tr>
-            <td>/api/get_all_spring_controllers</td>
-            <td>/</td>
-            <td>查询所有的 SPRING CONTROLLER</td>
-        </tr>
-        <tr>
-            <td>/api/get_spring_mappings</td>
-            <td>class=${class-name}</td>
-            <td>根据类名查询所有的 SPRING MAPPING</td>
-        </tr>
-        <tr>
-            <td>/api/get_abs_path</td>
-            <td>class=${class-name}</td>
-            <td>得到 CLASS 文件的本地绝对路径</td>
-        </tr>
-        <tr>
-            <td>/api/get_class_by_class</td>
-            <td>class=${class-name}</td>
-            <td>得到 CLASS 的详细信息</td>
-        </tr>
-        <tr>
-            <td>/api/get_all_servlets</td>
-            <td>/</td>
-            <td>得到所有的 SERVLET 信息</td>
-        </tr>
-        <tr>
-            <td>/api/get_all_listeners</td>
-            <td>/</td>
-            <td>得到所有的 LISTENER 信息</td>
-        </tr>
-        <tr>
-            <td>/api/get_all_filters</td>
-            <td>/</td>
-            <td>得到所有的 FILTER 信息</td>
-        </tr>
-        <tr>
-            <td>/api/fernflower_code</td>
-            <td>class=${class-name}&method=${method}&desc=${desc}</td>
-            <td>使用 FERNFLOWER 反编译某个方法</td>
-        </tr>
-        <tr>
-            <td>/api/cfr_code</td>
-            <td>class=${class-name}&method=${method}&desc=${desc}</td>
-            <td>使用 CFR 反编译某个方法</td>
-        </tr>
-        <tr>
-            <td>/api/dfs_analyze</td>
-            <td>参数过多请参考 DFSHandler 类</td>
-            <td>执行 DFS 分析</td>
-        </tr>
-        </tbody>
-    </table>
+    <header class="hero panel">
+        <div class="eyebrow">Browser Workbench</div>
+        <div class="hero-main">
+            <div>
+                <h1>Jar Analyzer 浏览器工作台</h1>
+                <p class="hero-copy">
+                    现在可以直接在浏览器里上传 JAR/WAR、构建数据库、查看调用图与污点路径，并继续完成查询、DFS、代码查看和 LLM 审计报告生成。
+                </p>
+            </div>
+            <div class="hero-actions">
+                <button id="refreshStatusBtn" class="btn btn-primary" type="button">刷新状态</button>
+                <button id="quickControllersBtn" class="btn btn-secondary" type="button">加载 Spring Controllers</button>
+                <button id="goBuildPageBtn" class="btn btn-link" type="button">打开导入页</button>
+            </div>
+        </div>
+
+        <div id="globalNotice" class="notice hidden"></div>
+
+        <div class="metric-grid">
+            <article class="metric-card metric-card-engine">
+                <span class="metric-label">引擎状态</span>
+                <strong id="engineMetricValue">待检测</strong>
+                <span id="engineMetricMeta">等待刷新</span>
+            </article>
+            <article class="metric-card metric-card-jar">
+                <span class="metric-label">已加载 JAR</span>
+                <strong id="jarMetricValue">0</strong>
+                <span id="jarMetricMeta">等待刷新</span>
+            </article>
+            <article class="metric-card metric-card-cache">
+                <span class="metric-label">一键分析缓存</span>
+                <strong id="cacheMetricValue">0 / 0</strong>
+                <span id="cacheMetricMeta">DFA / Gadget</span>
+            </article>
+            <article class="metric-card metric-card-auth">
+                <span class="metric-label">Server Auth</span>
+                <strong id="authMetricValue">待检测</strong>
+                <span id="authMetricMeta">Token Header</span>
+            </article>
+        </div>
+    </header>
+
+    <main class="workspace-grid">
+        <aside class="sidebar-stack">
+            <section class="panel side-panel">
+                <div class="section-kicker">导航</div>
+                <nav class="anchor-nav">
+                    <button class="nav-link nav-link-active" data-page-target="overview" type="button">概览</button>
+                    <button class="nav-link" data-page-target="build" type="button">浏览器构建</button>
+                    <button class="nav-link" data-page-target="search" type="button">方法检索</button>
+                    <button class="nav-link" data-page-target="method" type="button">方法工作台</button>
+                    <button class="nav-link" data-page-target="dfs" type="button">DFS 分析</button>
+                    <button class="nav-link" data-page-target="report" type="button">LLM 报告</button>
+                </nav>
+            </section>
+
+            <section class="panel side-panel">
+                <div class="section-kicker">API 鉴权</div>
+                <label class="field-label" for="authTokenInput">Token Header</label>
+                <input id="authTokenInput" class="field-input" type="password" autocomplete="off" placeholder="如果启用了 auth，请填入 server token">
+                <div class="side-actions compact-actions">
+                    <button id="saveTokenBtn" class="btn btn-secondary" type="button">保存 Token</button>
+                    <button id="clearTokenBtn" class="btn btn-ghost" type="button">清空</button>
+                </div>
+                <p class="side-note">
+                    页面本身可以公开访问，但当服务端启用了 auth 时，所有 API 请求仍然需要 Token Header。
+                </p>
+            </section>
+
+            <section class="panel side-panel">
+                <div class="section-kicker">当前选中方法</div>
+                <div id="selectedMethodCard" class="selection-card selection-card-empty">
+                    暂未选中方法。你可以从“方法检索”结果中点选一行，或在下方手工输入类名、方法名和描述符，然后直接生成调用图。
+                </div>
+            </section>
+
+            <section class="panel side-panel">
+                <div class="section-kicker">文档入口</div>
+                <div class="link-list">
+                    <a href="https://github.com/jar-analyzer/jar-analyzer/blob/master/doc/README-api.md" target="_blank" rel="noreferrer">HTTP API 文档</a>
+                    <a href="https://github.com/jar-analyzer/jar-analyzer/blob/master/mcp-doc/README.md" target="_blank" rel="noreferrer">MCP 文档</a>
+                    <a href="https://github.com/jar-analyzer/jar-analyzer/blob/master/skills/README.md" target="_blank" rel="noreferrer">Skills 文档</a>
+                </div>
+            </section>
+        </aside>
+
+        <div class="content-stack workspace-stage">
+            <section id="overview-panel" class="panel section-panel workspace-page workspace-page-active" data-page="overview">
+                <div class="section-head">
+                    <div>
+                        <div class="section-kicker">Overview</div>
+                        <h2>运行状态概览</h2>
+                    </div>
+                    <div id="statusRefreshTime" class="muted-text">尚未刷新</div>
+                </div>
+                <p id="statusMessage" class="section-copy">等待服务端状态返回。</p>
+                <div id="jarList" class="chip-list empty-list">当前没有可展示的输入包。</div>
+            </section>
+
+            <section id="build-panel" class="panel section-panel workspace-page" data-page="build">
+                <div class="section-head">
+                    <div>
+                        <div class="section-kicker">Import &amp; Build</div>
+                        <h2>导入 JAR/WAR 并建立分析索引</h2>
+                    </div>
+                    <div id="buildStatusPill" class="pill">等待构建</div>
+                </div>
+                <p class="section-copy">
+                    这一步不是“普通上传”。它会把归档解析成 jar-analyzer 的本地分析数据库，提取类、方法、调用关系、字符串、Spring/Web 组件，后面的检索、调用图、DFS 和报告都依赖它。
+                </p>
+                <div class="info-callout">
+                    <strong>你可以把它理解成：</strong>
+                    <p>把一个 JAR/WAR 导入成“可搜索、可画图、可追调用链”的项目索引。</p>
+                </div>
+
+                <form id="buildForm" class="tool-form stacked-form">
+                    <div class="dual-form-grid">
+                        <div>
+                            <label class="field-label" for="buildFileInput">上传归档</label>
+                            <input id="buildFileInput" class="field-input" type="file" accept=".jar,.war,.zip">
+                            <div class="side-note">上传文件会保存到 jar-analyzer-download/browser-upload 目录，然后自动进入解析流程。</div>
+                        </div>
+                        <div>
+                            <label class="field-label" for="buildSourcePathInput">服务器路径</label>
+                            <input id="buildSourcePathInput" class="field-input" type="text" placeholder="例如 E:/samples/demo.war">
+                            <div class="side-note">如果归档已经在服务端机器上，直接填写路径会更快，不必重新上传。</div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="field-label" for="buildRtJarPathInput">rt.jar 路径</label>
+                        <input id="buildRtJarPathInput" class="field-input" type="text" placeholder="可选，JDK 8 项目可填写本机 rt.jar 绝对路径">
+                    </div>
+
+                    <div class="triple-grid build-toggle-grid">
+                        <label class="toggle-field">
+                            <input id="buildQuickMode" type="checkbox">
+                            <span>quick_mode</span>
+                        </label>
+                        <label class="toggle-field">
+                            <input id="buildFixClass" type="checkbox">
+                            <span>fix_class</span>
+                        </label>
+                        <label class="toggle-field">
+                            <input id="buildCleanBeforeBuild" type="checkbox" checked>
+                            <span>clean_before_build</span>
+                        </label>
+                    </div>
+
+                    <div class="form-actions">
+                        <button id="startBuildBtn" class="btn btn-primary" type="submit">开始导入并建立索引</button>
+                        <button id="refreshBuildStatusBtn" class="btn btn-ghost" type="button">刷新构建状态</button>
+                    </div>
+                </form>
+
+                <div class="build-grid">
+                    <div>
+                        <div class="result-meta">构建进度</div>
+                        <div class="progress-shell">
+                            <div class="progress-track">
+                                <span id="buildProgressBar"></span>
+                            </div>
+                            <div class="progress-row">
+                                <strong id="buildProgressValue" class="progress-value">0%</strong>
+                                <span id="buildProgressMeta" class="muted-text">等待浏览器发起构建任务。</span>
+                            </div>
+                        </div>
+                        <div id="buildSourceMeta" class="result-meta">尚未选择输入包。</div>
+                        <div id="buildInfoChips" class="chip-list">
+                            <span>数据库: 未生成</span>
+                            <span>引擎: 未就绪</span>
+                            <span>任务: 待命</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="result-meta">构建日志</div>
+                        <div id="buildLogs" class="log-surface build-log-surface">等待浏览器发起构建。</div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="search-panel" class="panel section-panel workspace-page" data-page="search">
+                <div class="section-head">
+                    <div>
+                        <div class="section-kicker">Discovery</div>
+                        <h2>方法检索与控制器枚举</h2>
+                    </div>
+                    <div class="pill">搜索结果可直接送入方法工作台</div>
+                </div>
+
+                <div class="dual-form-grid">
+                    <form id="searchByClassForm" class="tool-form">
+                        <label class="field-label" for="searchClassInput">按类名检索方法</label>
+                        <input id="searchClassInput" class="field-input" type="text" placeholder="例如 org.springframework.web.servlet.DispatcherServlet">
+                        <div class="form-actions">
+                            <button class="btn btn-primary" type="submit">查询方法</button>
+                            <button id="loadJarListBtn" class="btn btn-ghost" type="button">加载 JAR 列表</button>
+                        </div>
+                    </form>
+
+                    <form id="searchByStringForm" class="tool-form">
+                        <label class="field-label" for="searchStringInput">按字符串检索方法</label>
+                        <input id="searchStringInput" class="field-input" type="text" placeholder="例如 exec / select / ldap / Runtime">
+                        <div class="form-actions">
+                            <button class="btn btn-primary" type="submit">字符串检索</button>
+                            <button id="loadControllersBtn" class="btn btn-ghost" type="button">Spring Controllers</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div id="searchResultMeta" class="result-meta">等待查询。</div>
+                <div id="searchResults" class="result-surface"></div>
+            </section>
+
+            <section id="method-panel" class="panel section-panel workspace-page" data-page="method">
+                <div class="section-head">
+                    <div>
+                        <div class="section-kicker">Method Workbench</div>
+                        <h2>调用关系与反编译查看</h2>
+                    </div>
+                    <div class="pill">支持 callers / callee / impls / decompile / graph</div>
+                </div>
+
+                <form id="methodWorkbenchForm" class="tool-form stacked-form">
+                    <div class="triple-grid">
+                        <div>
+                            <label class="field-label" for="methodClassInput">类名</label>
+                            <input id="methodClassInput" class="field-input" type="text" placeholder="完整类名或内部名">
+                        </div>
+                        <div>
+                            <label class="field-label" for="methodNameInput">方法名</label>
+                            <input id="methodNameInput" class="field-input" type="text" placeholder="例如 doFilter / exec / <init>">
+                        </div>
+                        <div>
+                            <label class="field-label" for="methodDescInput">方法描述符</label>
+                            <input id="methodDescInput" class="field-input" type="text" placeholder="例如 (Ljava/lang/String;)V">
+                        </div>
+                    </div>
+
+                    <div class="chip-actions">
+                        <button class="btn btn-primary" data-method-action="callers" type="button">调用者</button>
+                        <button class="btn btn-primary" data-method-action="callee" type="button">被调用</button>
+                        <button id="methodGraphBtn" class="btn btn-secondary" type="button">调用图</button>
+                        <button class="btn btn-secondary" data-method-action="impls" type="button">实现类</button>
+                        <button class="btn btn-secondary" data-method-action="superImpls" type="button">父类接口</button>
+                        <button class="btn btn-ghost" data-method-action="cfr" type="button">CFR 反编译</button>
+                        <button class="btn btn-ghost" data-method-action="fernflower" type="button">Fernflower 反编译</button>
+                        <button id="openMethodGraphBtn" class="btn btn-ghost" type="button">新窗口打开调用图</button>
+                    </div>
+                </form>
+
+                <div id="methodResultMeta" class="result-meta">等待操作。</div>
+                <div id="methodResults" class="result-surface"></div>
+
+                <div class="graph-toolbar">
+                    <div id="methodGraphMeta" class="result-meta">等待生成方法调用图。</div>
+                </div>
+                <div class="report-view">
+                    <iframe id="methodGraphFrame" class="graph-frame" title="方法调用图"></iframe>
+                </div>
+            </section>
+
+            <section id="dfs-panel" class="panel section-panel workspace-page" data-page="dfs">
+                <div class="section-head">
+                    <div>
+                        <div class="section-kicker">Graph Search</div>
+                        <h2>DFS 分析面板</h2>
+                    </div>
+                    <button id="fillRuntimePresetBtn" class="btn btn-ghost" type="button">填充 Runtime.exec 预设</button>
+                </div>
+
+                <form id="dfsForm" class="tool-form stacked-form">
+                    <div class="triple-grid">
+                        <div>
+                            <label class="field-label" for="dfsSinkClass">Sink Class</label>
+                            <input id="dfsSinkClass" class="field-input" type="text" value="java/lang/Runtime">
+                        </div>
+                        <div>
+                            <label class="field-label" for="dfsSinkMethod">Sink Method</label>
+                            <input id="dfsSinkMethod" class="field-input" type="text" value="exec">
+                        </div>
+                        <div>
+                            <label class="field-label" for="dfsSinkDesc">Sink Desc</label>
+                            <input id="dfsSinkDesc" class="field-input" type="text" value="(Ljava/lang/String;)Ljava/lang/Process;">
+                        </div>
+                    </div>
+
+                    <div class="triple-grid">
+                        <div>
+                            <label class="field-label" for="dfsSourceClass">Source Class</label>
+                            <input id="dfsSourceClass" class="field-input" type="text" placeholder="可选">
+                        </div>
+                        <div>
+                            <label class="field-label" for="dfsSourceMethod">Source Method</label>
+                            <input id="dfsSourceMethod" class="field-input" type="text" placeholder="可选">
+                        </div>
+                        <div>
+                            <label class="field-label" for="dfsSourceDesc">Source Desc</label>
+                            <input id="dfsSourceDesc" class="field-input" type="text" placeholder="可选">
+                        </div>
+                    </div>
+
+                    <div class="quad-grid">
+                        <div>
+                            <label class="field-label" for="dfsDepth">Depth</label>
+                            <input id="dfsDepth" class="field-input" type="number" min="1" value="10">
+                        </div>
+                        <div>
+                            <label class="field-label" for="dfsLimit">Limit</label>
+                            <input id="dfsLimit" class="field-input" type="number" min="1" value="10">
+                        </div>
+                        <label class="toggle-field">
+                            <input id="dfsFromSink" type="checkbox" checked>
+                            <span>from_sink</span>
+                        </label>
+                        <label class="toggle-field">
+                            <input id="dfsSearchNullSource" type="checkbox" checked>
+                            <span>search_null_source</span>
+                        </label>
+                    </div>
+
+                    <div class="form-actions">
+                        <button class="btn btn-primary" type="submit">执行 DFS</button>
+                        <button id="taintGraphBtn" class="btn btn-secondary" type="button">生成污点图</button>
+                        <button id="openTaintGraphBtn" class="btn btn-ghost" type="button">新窗口打开污点图</button>
+                    </div>
+                </form>
+
+                <div id="dfsResultMeta" class="result-meta">等待 DFS 分析。</div>
+                <div id="dfsResults" class="result-surface"></div>
+
+                <div class="graph-toolbar">
+                    <div id="taintGraphMeta" class="result-meta">等待生成污点与 DFS 图。</div>
+                </div>
+                <div class="report-view">
+                    <iframe id="taintGraphFrame" class="graph-frame" title="污点与 DFS 图"></iframe>
+                </div>
+            </section>
+
+            <section id="report-panel" class="panel section-panel report-panel workspace-page" data-page="report">
+                <div class="section-head">
+                    <div>
+                        <div class="section-kicker">Audit Report</div>
+                        <h2>LLM 审计报告</h2>
+                    </div>
+                    <div id="reportSummaryPill" class="pill">等待生成</div>
+                </div>
+
+                <form id="reportConfigForm" class="tool-form stacked-form">
+                    <div class="dual-form-grid">
+                        <div>
+                            <label class="field-label" for="reportEndpointInput">API Endpoint</label>
+                            <input id="reportEndpointInput" class="field-input" type="text" value="https://api.openai.com/v1/chat/completions">
+                        </div>
+                        <div>
+                            <label class="field-label" for="reportModelInput">模型名称</label>
+                            <input id="reportModelInput" class="field-input" type="text" value="gpt-4o-mini">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="field-label" for="reportApiKeyInput">API Key</label>
+                        <input id="reportApiKeyInput" class="field-input" type="password" autocomplete="off" placeholder="兼容 OpenAI API 的 Bearer Key">
+                    </div>
+                    <div class="chip-actions">
+                        <button id="reportAnalyzeBtn" class="btn btn-primary" type="button">一键分析并生成报告</button>
+                        <button id="reportCacheBtn" class="btn btn-secondary" type="button">仅基于缓存生成</button>
+                    </div>
+                </form>
+
+                <div class="report-standalone-card">
+                    <div class="result-meta">独立报告页</div>
+                    <p id="reportLinkHint" class="side-note">
+                        生成成功后，可从这里直接打开完整报告页面。主工作台不再内嵌报告预览。
+                    </p>
+                    <div class="chip-actions">
+                        <a id="reportStandaloneLink" class="btn btn-secondary" href="/report/latest" target="_blank" rel="noreferrer">打开独立报告页</a>
+                    </div>
+                </div>
+
+                <div class="result-meta">分析与生成日志</div>
+                <div id="reportLogs" class="log-surface report-log-surface">等待报告任务开始。</div>
+            </section>
+        </div>
+    </main>
 </div>
-<script src="/static/boot.js"></script>
+
+<script src="/static/dashboard.js"></script>
 </body>
 </html>

@@ -20,9 +20,13 @@ import java.io.InputStream;
 public class JSHandler extends BaseHandler implements HttpHandler {
     @Override
     public NanoHTTPD.Response handle(NanoHTTPD.IHTTPSession session) {
-        InputStream is = CSSHandler.class.getClassLoader().getResourceAsStream("report/BT_JS.js");
+        String resource = "report/BT_JS.js";
+        if ("/static/dashboard.js".equals(session.getUri())) {
+            resource = "server/dashboard.js";
+        }
+        InputStream is = CSSHandler.class.getClassLoader().getResourceAsStream(resource);
         if (is == null) {
-            return errorMsg("could not find BT_JS.js");
+            return errorMsg("could not find js resource: " + resource);
         }
         String js = IOUtil.readString(is);
         return NanoHTTPD.newFixedLengthResponse(NanoHTTPD.Response.Status.OK, "text/javascript", js);
