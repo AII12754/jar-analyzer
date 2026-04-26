@@ -2,7 +2,7 @@
 
 > 目标：让老师快速看到成果完整、工作量充分、实现不简单、协作合理
 > 建议页数：14 到 16 页
-> 提交前请把成员占位符替换为真实姓名，并按实际情况微调分工表述
+> 统计口径说明：代码量仅计算作者 AII12754 <aii1275438796@gmail.com> 的实际代码改动，且已排除 doc 目录与全部 Markdown 文档。
 
 ---
 
@@ -48,11 +48,11 @@ Jar Analyzer 功能增强与安全分析工作流重构
 
 | 成员 | 分工 |
 |------|------|
-| 成员 1 | 需求分析与总体设计 |
-| 成员 2 | 桌面端搜索与过滤增强 |
-| 成员 3 | 调用图、污点图与浏览器前端交互 |
-| 成员 4 | 后端接口聚合与安全巡航逻辑 |
-| 成员 5 | 测试、部署、文档与最终整合 |
+| 成员 1 | 需求设计与项目统筹 |
+| 成员 2 | 搜索表达式与结果治理 |
+| 成员 3 | 可视化与前端交互 |
+| 成员 4 | 后端接口与分析链路 |
+| 成员 5 | 测试部署与文档交付 |
 
 ### 本页要讲的话
 
@@ -201,19 +201,23 @@ Jar Analyzer 功能增强与安全分析工作流重构
 
 #### 第一周：完成第一轮增强
 
-1. 完成需求拆解
-2. 按模块分工推进桌面端搜索、过滤、可视化能力
-3. 第一轮结束前完成联调与讲稿整理
+1. 成员 1 负责需求拆解、任务切分和阶段联调安排
+2. 成员 2 负责 containsInvoke / excludeInvoke、正则搜索、黑白名单过滤、CSV 导出
+3. 成员 3 负责交互式调用图与污点传播可视化展示
+4. 成员 4 负责调用图 / 污点图接口接入与联调
+5. 成员 5 负责测试样本、测试用例、中期讲稿与阶段验收材料
 
 #### 第三周：完成第二轮增强
 
-1. 再次拆分浏览器工作台相关任务
-2. 完成前端页面、后端聚合、安全巡航、DFS 预设、报告页等模块开发
-3. 第二轮结束前完成联调、回归测试与最终文档整合
+1. 成员 1 负责浏览器工作流规划、模块集成与最终方案收口
+2. 成员 2 负责方法工作台承接、风险线索跳转与结果组织
+3. 成员 3 负责 dashboard 前端交互、安全巡航展示与 DFS 预设呈现
+4. 成员 4 负责构建流程接口、安全巡航聚合、报告页路由与方法联动后端支撑
+5. 成员 5 负责回归测试、部署验证、演示脚本与最终提交材料整理
 
 ### 本页讲解重点
 
-把团队协作过程讲清楚，体现分工合理、阶段明确、推进有节奏。
+把团队协作过程讲清楚，体现分工对应、阶段明确、推进有节奏。
 
 ---
 
@@ -246,7 +250,10 @@ Jar Analyzer 功能增强与安全分析工作流重构
 2. 覆盖搜索、过滤、导出等核心逻辑
 3. 浏览器工作台完成功能回归与链路验证
 4. 构建部署：JDK 21 + Maven，主工程与样本均可独立打包运行
-5. 第一轮统计：19 文件变更，1945 行新增，246 行删除
+5. 第一轮纯代码统计：7 文件变更，964 行新增，3 行删除
+6. 第二轮纯代码统计：52 文件变更，8792 行新增，212 行删除
+7. 两轮合并纯代码统计：55 文件变更，9748 行新增，207 行删除
+8. 统计已排除 doc 目录与全部 Markdown 文档
 
 ### 本页讲解重点
 
@@ -297,3 +304,51 @@ Jar Analyzer 功能增强与安全分析工作流重构
 3. 我们不是只改桌面端，也不是只改前端，而是做了跨层联动增强。
 4. 我们不仅能发现线索，还能继续验证链路并输出报告。
 5. 从工作量和完成度上看，这已经明显超出普通课程作业式的小修小补。
+
+---
+
+## 附：PPT 制作时可直接截图的代码入口
+
+### 第 6 页：搜索增强
+
+1. [src/main/java/me/n1ar4/jar/analyzer/el/MethodEL.java](../src/main/java/me/n1ar4/jar/analyzer/el/MethodEL.java)
+2. [src/main/java/me/n1ar4/jar/analyzer/el/MethodELProcessor.java](../src/main/java/me/n1ar4/jar/analyzer/el/MethodELProcessor.java)
+3. [src/main/java/me/n1ar4/jar/analyzer/exporter/SearchResultCsvExporter.java](../src/main/java/me/n1ar4/jar/analyzer/exporter/SearchResultCsvExporter.java)
+4. [src/main/java/me/n1ar4/jar/analyzer/gui/MainForm.java](../src/main/java/me/n1ar4/jar/analyzer/gui/MainForm.java)
+
+### 第 7 页：调用图与污点图可视化
+
+1. [src/main/java/me/n1ar4/jar/analyzer/graph/HtmlGraphUtil.java](../src/main/java/me/n1ar4/jar/analyzer/graph/HtmlGraphUtil.java)
+2. [src/main/java/me/n1ar4/jar/analyzer/graph/RenderEngine.java](../src/main/java/me/n1ar4/jar/analyzer/graph/RenderEngine.java)
+3. [src/main/java/me/n1ar4/jar/analyzer/graph/TaintGraphRenderEngine.java](../src/main/java/me/n1ar4/jar/analyzer/graph/TaintGraphRenderEngine.java)
+4. [src/main/java/me/n1ar4/jar/analyzer/server/handler/TaintGraphHandler.java](../src/main/java/me/n1ar4/jar/analyzer/server/handler/TaintGraphHandler.java)
+
+### 第 8 页：浏览器导入与安全巡航入口
+
+1. [src/main/java/me/n1ar4/jar/analyzer/server/handler/StartProjectBuildHandler.java](../src/main/java/me/n1ar4/jar/analyzer/server/handler/StartProjectBuildHandler.java)
+2. [src/main/java/me/n1ar4/jar/analyzer/server/handler/GetBuildStatusHandler.java](../src/main/java/me/n1ar4/jar/analyzer/server/handler/GetBuildStatusHandler.java)
+3. [src/main/java/me/n1ar4/jar/analyzer/server/PathMatcher.java](../src/main/java/me/n1ar4/jar/analyzer/server/PathMatcher.java)
+4. [src/main/resources/index.html](../src/main/resources/index.html)
+5. [src/main/resources/server/dashboard.js](../src/main/resources/server/dashboard.js)
+
+### 第 9 页：内置漏洞排查与风险排序
+
+1. [src/main/java/me/n1ar4/jar/analyzer/server/handler/GetSecurityOverviewHandler.java](../src/main/java/me/n1ar4/jar/analyzer/server/handler/GetSecurityOverviewHandler.java)
+2. [src/main/java/me/n1ar4/jar/analyzer/server/PathMatcher.java](../src/main/java/me/n1ar4/jar/analyzer/server/PathMatcher.java)
+3. [src/main/resources/server/dashboard.js](../src/main/resources/server/dashboard.js)
+4. [src/main/resources/server/dashboard.css](../src/main/resources/server/dashboard.css)
+
+### 第 10 页：方法联动、DFS 预设与报告交付
+
+1. [src/main/resources/server/dashboard.js](../src/main/resources/server/dashboard.js)
+2. [src/main/java/me/n1ar4/jar/analyzer/server/handler/GenerateAuditReportHandler.java](../src/main/java/me/n1ar4/jar/analyzer/server/handler/GenerateAuditReportHandler.java)
+3. [src/main/java/me/n1ar4/jar/analyzer/server/LatestAuditReportStore.java](../src/main/java/me/n1ar4/jar/analyzer/server/LatestAuditReportStore.java)
+4. [src/main/java/me/n1ar4/jar/analyzer/server/handler/GetLatestAuditReportPageHandler.java](../src/main/java/me/n1ar4/jar/analyzer/server/handler/GetLatestAuditReportPageHandler.java)
+5. [src/main/java/me/n1ar4/jar/analyzer/report/MarkdownReportRenderer.java](../src/main/java/me/n1ar4/jar/analyzer/report/MarkdownReportRenderer.java)
+
+### 第 12 页：技术深度证明
+
+1. [src/main/java/me/n1ar4/jar/analyzer/core/BytecodeCallGraph.java](../src/main/java/me/n1ar4/jar/analyzer/core/BytecodeCallGraph.java)
+2. [src/main/java/me/n1ar4/jar/analyzer/taint/dfa/DFAEngine.java](../src/main/java/me/n1ar4/jar/analyzer/taint/dfa/DFAEngine.java)
+3. [src/main/java/me/n1ar4/jar/analyzer/server/ProjectBuildManager.java](../src/main/java/me/n1ar4/jar/analyzer/server/ProjectBuildManager.java)
+4. [src/main/java/me/n1ar4/jar/analyzer/report/ReportPanel.java](../src/main/java/me/n1ar4/jar/analyzer/report/ReportPanel.java)
