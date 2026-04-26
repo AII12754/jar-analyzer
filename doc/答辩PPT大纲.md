@@ -46,13 +46,14 @@ Jar Analyzer 功能增强与安全分析工作流重构
 
 ### 页面内容
 
-| 成员 | 分工 |
-|------|------|
-| 成员 1 | 需求设计与项目统筹 |
+
+| 成员   | 分工                 |
+| ------ | -------------------- |
+| 成员 1 | 需求设计与项目统筹   |
 | 成员 2 | 搜索表达式与结果治理 |
-| 成员 3 | 可视化与前端交互 |
-| 成员 4 | 后端接口与分析链路 |
-| 成员 5 | 测试部署与文档交付 |
+| 成员 3 | 可视化与前端交互     |
+| 成员 4 | 后端接口与分析链路   |
+| 成员 5 | 测试部署与文档交付   |
 
 ### 本页要讲的话
 
@@ -343,7 +344,7 @@ Jar Analyzer 功能增强与安全分析工作流重构
 1. [src/main/resources/server/dashboard.js](../src/main/resources/server/dashboard.js)
 2. [src/main/java/me/n1ar4/jar/analyzer/server/handler/GenerateAuditReportHandler.java](../src/main/java/me/n1ar4/jar/analyzer/server/handler/GenerateAuditReportHandler.java)
 3. [src/main/java/me/n1ar4/jar/analyzer/server/LatestAuditReportStore.java](../src/main/java/me/n1ar4/jar/analyzer/server/LatestAuditReportStore.java)
-4. [src/main/java/me/n1ar4/jar/analyzer/server/handler/GetLatestAuditReportPageHandler.java](../src/main/java/me/n1ar4/jar/analyzer/server/handler/GetLatestAuditReportPageHandler.java)
+4. [src/main/java/m1e/n1ar4/jar/analyzer/server/handler/GetLatestAuditReportPageHandler.java](../src/main/java/me/n1ar4/jar/analyzer/server/handler/GetLatestAuditReportPageHandler.java)
 5. [src/main/java/me/n1ar4/jar/analyzer/report/MarkdownReportRenderer.java](../src/main/java/me/n1ar4/jar/analyzer/report/MarkdownReportRenderer.java)
 
 ### 第 12 页：技术深度证明
