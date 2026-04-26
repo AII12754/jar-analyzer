@@ -255,10 +255,12 @@ Jar Analyzer 功能增强与安全分析工作流重构
 6. 第二轮纯代码统计：52 文件变更，8792 行新增，212 行删除
 7. 两轮合并纯代码统计：55 文件变更，9748 行新增，207 行删除
 8. 统计已排除 doc 目录与全部 Markdown 文档
+9. 第二轮代码量 breakdown：
+   浏览器工作台前端 3221/125，DFA 与调用图核心 1741/62，LLM报告生成与交付 1301/0，浏览器构建与接口链路 1102/23，一键分析与利用链能力 1064/0，演示样本与测试支撑 267/0，其余配套调整 96/2
 
 ### 本页讲解重点
 
-把测试充分、部署可用、工作量明确、成果完整一起讲清楚。
+把测试充分、部署可用、工作量明确、成果完整一起讲清楚。第二轮代码量大的原因要明确说明为跨层联动实现，而不是单个前端页面变长。
 
 ---
 
@@ -344,7 +346,7 @@ Jar Analyzer 功能增强与安全分析工作流重构
 1. [src/main/resources/server/dashboard.js](../src/main/resources/server/dashboard.js)
 2. [src/main/java/me/n1ar4/jar/analyzer/server/handler/GenerateAuditReportHandler.java](../src/main/java/me/n1ar4/jar/analyzer/server/handler/GenerateAuditReportHandler.java)
 3. [src/main/java/me/n1ar4/jar/analyzer/server/LatestAuditReportStore.java](../src/main/java/me/n1ar4/jar/analyzer/server/LatestAuditReportStore.java)
-4. [src/main/java/m1e/n1ar4/jar/analyzer/server/handler/GetLatestAuditReportPageHandler.java](../src/main/java/me/n1ar4/jar/analyzer/server/handler/GetLatestAuditReportPageHandler.java)
+4. [src/main/java/me/n1ar4/jar/analyzer/server/handler/GetLatestAuditReportPageHandler.java](../src/main/java/me/n1ar4/jar/analyzer/server/handler/GetLatestAuditReportPageHandler.java)
 5. [src/main/java/me/n1ar4/jar/analyzer/report/MarkdownReportRenderer.java](../src/main/java/me/n1ar4/jar/analyzer/report/MarkdownReportRenderer.java)
 
 ### 第 12 页：技术深度证明
