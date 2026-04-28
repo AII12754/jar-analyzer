@@ -98,6 +98,14 @@ public class CoreEngine {
         return results.isEmpty() ? null : results.get(0);
     }
 
+    public ArrayList<ClassResult> getClassByClassLike(String className) {
+        SqlSession session = factory.openSession(true);
+        ClassMapper classMapper = session.getMapper(ClassMapper.class);
+        ArrayList<ClassResult> results = new ArrayList<>(classMapper.selectClassByClassNameLike(className));
+        session.close();
+        return results;
+    }
+
     public String getAbsPath(String className) {
         SqlSession session = factory.openSession(true);
         ClassFileMapper classMapper = session.getMapper(ClassFileMapper.class);
