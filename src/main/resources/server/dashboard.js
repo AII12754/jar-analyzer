@@ -568,18 +568,25 @@ async function onSearchByClass(event) {
         dom.searchClassInput.focus();
         return;
     }
-    await runSearch('/api/get_methods_by_class', {class: className}, `类 ${className} 的方法列表`);
+    await runSearch('/api/get_class_by_class', {class: className}, `类 ${className} 的信息`, {
+        transformData(data) {
+            if (!data) {
+                return [];
+            }
+            return Array.isArray(data) ? data : [data];
+        }
+    });
 }
 
 async function onSearchByString(event) {
     event.preventDefault();
-    const searchValue = dom.searchStringInput.value.trim();
-    if (!searchValue) {
-        showNotice('warning', '请先填写需要搜索的字符串。');
+    const methodName = dom.searchStringInput.value.trim();
+    if (!methodName) {
+        showNotice('warning', '请先填写需要搜索的方法名。');
         dom.searchStringInput.focus();
         return;
     }
-    await runSearch('/api/get_methods_by_str', {str: searchValue}, `字符串 ${searchValue} 的命中方法`);
+    await runSearch('/api/get_method_like', {method: methodName}, `方法名 ${methodName} 的命中方法`);
 }
 
 async function loadJarList() {
@@ -590,15 +597,18 @@ async function loadSpringControllers() {
     await runSearch('/api/get_all_spring_controllers', {}, 'Spring Controllers');
 }
 
-async function runSearch(path, params, label) {
+async function runSearch(path, params, label, options) {
     dom.searchResultMeta.textContent = `正在执行 ${label}...`;
     renderLoading(dom.searchResults, '查询进行中，请稍候...');
     try {
-        const data = await apiRequest(path, params);
+        const rawData = await apiRequest(path, params);
+        const data = options && typeof options.transformData === 'function'
+            ? options.transformData(rawData)
+            : rawData;
         renderDataSet(dom.searchResults, data, {selectable: true});
         dom.searchResultMeta.textContent = summarizeData(label, data);
         if (Array.isArray(data) && data.length > 0 && isMethodLike(data[0])) {
-            showNotice('info', '检索结果已加载。点“选中”可直接送入方法工作台。');
+            showNotice('info', '检索结果已加载。点“选中”仅同步当前方法，点“工作台”可直接打开方法工作台。');
         }
     } catch (error) {
         dom.searchResultMeta.textContent = '查询失败';
@@ -860,7 +870,7 @@ function renderSecurityPriorities(hunts) {
         });
 
     if (positive.length === 0) {
-        renderEmpty(dom.securityPriorityBoard, '当前没有命中内置危险 Sink。可以先导入样本或手动在方法检索页搜索。');
+        renderEmpty(dom.securityPriorityBoard, '当前没有命中内置危险 Sink。可以先导入样本或手动在类 / 方法检索页搜索。');
         return;
     }
 
@@ -957,7 +967,7 @@ function renderSecurityHunts(hunts) {
                             <button class="mini-btn" data-security-preset="${escapeHtml(hunt.presetId || '')}" type="button">套用 DFS 预设</button>
                         </div>
                         ${findings.length > 0
-                            ? `<div class="hunt-list">${preview}</div>${findings.length > 5 ? `<div class="tiny-note">其余 ${escapeHtml(String(findings.length - 5))} 条可以继续在方法检索或方法工作台中展开。</div>` : ''}`
+                            ? `<div class="hunt-list">${preview}</div>${findings.length > 5 ? `<div class="tiny-note">其余 ${escapeHtml(String(findings.length - 5))} 条可以继续在类 / 方法检索或方法工作台中展开。</div>` : ''}`
                             : '<div class="result-empty">当前未命中。</div>'}
                     </article>
                 `;
@@ -1022,7 +1032,7 @@ function renderSecurityEntryPoints(mappings) {
                 </div>
             `).join('')}
             ${state.securityEntryRows.length > displayRows.length
-                ? `<div class="tiny-note">当前仅展示前 ${escapeHtml(String(displayRows.length))} 条入口映射，完整结果建议结合方法检索页继续展开。</div>`
+                ? `<div class="tiny-note">当前仅展示前 ${escapeHtml(String(displayRows.length))} 条入口映射，完整结果建议结合类 / 方法检索页继续展开。</div>`
                 : ''}
         </div>
     `;
@@ -1357,7 +1367,7 @@ function setSelectedMethod(method) {
 function renderSelectedMethod() {
     if (!state.selectedMethod) {
         dom.selectedMethodCard.className = 'selection-card selection-card-empty';
-        dom.selectedMethodCard.textContent = '暂未选中方法。你可以从“方法检索”结果中点选一行，或在下方手工输入类名、方法名和描述符，然后直接生成调用图。';
+        dom.selectedMethodCard.textContent = '暂未选中方法。你可以从“类 / 方法检索”结果中点选一行，或在下方手工输入类名、方法名和描述符，然后直接生成调用图。';
         return;
     }
     dom.selectedMethodCard.className = 'selection-card';
@@ -1406,7 +1416,7 @@ function renderArray(container, rows, options) {
         html += `<tr class="${selectable ? 'selectable-row' : ''}">`;
         if (options.selectable) {
             html += selectable
-                ? `<td><button class="mini-btn" type="button" data-select-index="${index}">选中</button></td>`
+                ? `<td><div class="table-actions"><button class="mini-btn" type="button" data-select-index="${index}">选中</button><button class="mini-btn" type="button" data-open-workbench-index="${index}">工作台</button></div></td>`
                 : '<td>-</td>';
         }
         columns.forEach((column) => {
@@ -1424,8 +1434,18 @@ function renderArray(container, rows, options) {
             const row = rows[Number(button.dataset.selectIndex)];
             if (row) {
                 setSelectedMethod(row);
+                showNotice('success', '已选中方法。你可以继续留在当前页筛选结果，或点击“工作台”进入方法工作台。');
+            }
+        });
+    });
+
+    container.querySelectorAll('[data-open-workbench-index]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const row = rows[Number(button.dataset.openWorkbenchIndex)];
+            if (row) {
+                setSelectedMethod(row);
                 activatePage('method');
-                showNotice('info', '已将方法送入工作台。');
+                showNotice('info', '已打开方法工作台。');
             }
         });
     });

@@ -31,9 +31,6 @@ public class GetMethodLikeHandler extends BaseHandler implements HttpHandler {
         String clazz = getClassName(session);
         String method = getMethodName(session);
         String desc = getMethodDesc(session);
-        if (StringUtil.isNull(clazz)) {
-            return needParam("class");
-        }
         if (StringUtil.isNull(method)) {
             return needParam("method");
         }

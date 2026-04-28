@@ -268,13 +268,16 @@ input {
 .sidebar-stack,
 .content-stack {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 18px;
     align-content: start;
+    min-width: 0;
 }
 
 .side-panel,
 .section-panel {
     padding: 22px;
+    min-width: 0;
 }
 
 .anchor-nav {
@@ -351,6 +354,8 @@ input {
     padding: 14px;
     margin-top: 14px;
     min-height: 132px;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .selection-card-empty {
@@ -360,6 +365,9 @@ input {
 .selection-card strong,
 .selection-card code {
     display: block;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    word-break: break-word;
 }
 
 .selection-card code,
@@ -616,6 +624,12 @@ input {
     background: var(--teal-soft);
     color: var(--teal);
     cursor: pointer;
+}
+
+.table-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 .json-block,

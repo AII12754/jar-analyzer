@@ -71,7 +71,7 @@
                 <nav class="anchor-nav">
                     <button class="nav-link nav-link-active" data-page-target="overview" type="button">概览</button>
                     <button class="nav-link" data-page-target="build" type="button">浏览器构建</button>
-                    <button class="nav-link" data-page-target="search" type="button">方法检索</button>
+                    <button class="nav-link" data-page-target="search" type="button">类 / 方法检索</button>
                     <button class="nav-link" data-page-target="method" type="button">方法工作台</button>
                     <button class="nav-link" data-page-target="dfs" type="button">DFS 分析</button>
                     <button class="nav-link" data-page-target="security" type="button">安全巡航</button>
@@ -95,7 +95,7 @@
             <section class="panel side-panel">
                 <div class="section-kicker">当前选中方法</div>
                 <div id="selectedMethodCard" class="selection-card selection-card-empty">
-                    暂未选中方法。你可以从“方法检索”结果中点选一行，或在下方手工输入类名、方法名和描述符，然后直接生成调用图。
+                    暂未选中方法。你可以从“类 / 方法检索”结果中点选一行，或在下方手工输入类名、方法名和描述符，然后直接生成调用图。
                 </div>
             </section>
 
@@ -209,26 +209,26 @@
                 <div class="section-head">
                     <div>
                         <div class="section-kicker">Discovery</div>
-                        <h2>方法检索与控制器枚举</h2>
+                        <h2>类 / 方法检索与控制器枚举</h2>
                     </div>
-                    <div class="pill">搜索结果可直接送入方法工作台</div>
+                    <div class="pill">支持选中当前方法或直接进入方法工作台</div>
                 </div>
 
                 <div class="dual-form-grid">
                     <form id="searchByClassForm" class="tool-form">
-                        <label class="field-label" for="searchClassInput">按类名检索方法</label>
+                        <label class="field-label" for="searchClassInput">检索类</label>
                         <input id="searchClassInput" class="field-input" type="text" placeholder="例如 org.springframework.web.servlet.DispatcherServlet">
                         <div class="form-actions">
-                            <button class="btn btn-primary" type="submit">查询方法</button>
+                            <button class="btn btn-primary" type="submit">检索类</button>
                             <button id="loadJarListBtn" class="btn btn-ghost" type="button">加载 JAR 列表</button>
                         </div>
                     </form>
 
                     <form id="searchByStringForm" class="tool-form">
-                        <label class="field-label" for="searchStringInput">按字符串检索方法</label>
-                        <input id="searchStringInput" class="field-input" type="text" placeholder="例如 exec / select / ldap / Runtime">
+                        <label class="field-label" for="searchStringInput">检索方法</label>
+                        <input id="searchStringInput" class="field-input" type="text" placeholder="例如 doFilter / exec / lookup / readObject">
                         <div class="form-actions">
-                            <button class="btn btn-primary" type="submit">字符串检索</button>
+                            <button class="btn btn-primary" type="submit">检索方法</button>
                             <button id="loadControllersBtn" class="btn btn-ghost" type="button">Spring Controllers</button>
                         </div>
                     </form>
