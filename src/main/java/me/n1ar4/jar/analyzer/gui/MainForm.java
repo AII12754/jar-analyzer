@@ -381,6 +381,10 @@ public class MainForm {
         return dfsAdvanceBtn;
     }
 
+    public JPanel getChainsOpPanel() {
+        return chainsOpPanel;
+    }
+
     public JCheckBox getTaintBox() {
         return taintBox;
     }
@@ -884,6 +888,10 @@ public class MainForm {
 
     public JButton getGadgetStartBtn() {
         return gadgetStartBtn;
+    }
+
+    public JPanel getGadgetOpPanel() {
+        return gadgetOpPanel;
     }
 
     public JCheckBox getGadgetNativeBox() {
@@ -1746,6 +1754,36 @@ public class MainForm {
             TaintResultDialog.showTaintResults(instance.getMasterPanel().getTopLevelAncestor() instanceof Frame ?
                     (Frame) instance.getMasterPanel().getTopLevelAncestor() : null, new ArrayList<>(TaintCache.cache));
         });
+
+        // 过程间数据流分析（DFA）入口按钮
+        JButton dfaBtn = new JButton("过程间数据流分析（DFA）");
+        dfaBtn.setToolTipText("基于 Worklist 算法的过程间污点分析，自动追踪 Source→Sink 数据流");
+        dfaBtn.addActionListener(e -> me.n1ar4.jar.analyzer.taint.dfa.DFAPanel.openDialog());
+        instance.chainsOpPanel.add(dfaBtn, new GridConstraints(1, 6, 1, 1,
+            GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL,
+            GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW,
+            GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+
+        // LLM 安全审计报告生成入口
+        JButton reportBtn = new JButton("LLM 智能审计报告");
+        reportBtn.setToolTipText("聚合所有分析结果，调用 LLM 生成专业安全审计报告");
+        reportBtn.addActionListener(e -> me.n1ar4.jar.analyzer.report.ReportPanel.openDialog());
+        instance.chainsOpPanel.add(reportBtn, new GridConstraints(1, 7, 1, 1,
+            GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL,
+            GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW,
+            GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
+
+        // 一键智能安全扫描入口（自动执行 DFA + 利用链挖掘 → 打开报告面板）
+        JButton oneClickBtn = new JButton("★ 一键智能安全扫描");
+        oneClickBtn.setToolTipText("自动依次执行：过程间 DFA 分析 → 反序列化利用链挖掘 → 打开 LLM 审计报告");
+        oneClickBtn.setBackground(new Color(0, 100, 180));
+        oneClickBtn.setForeground(Color.WHITE);
+        oneClickBtn.setOpaque(true);
+        oneClickBtn.addActionListener(e -> me.n1ar4.jar.analyzer.oneclick.OneClickAnalyzer.run());
+        instance.chainsOpPanel.add(oneClickBtn, new GridConstraints(1, 8, 1, 2,
+            GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL,
+            GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW,
+            GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
     }
 
     private void resolveConfig() {
@@ -2379,7 +2417,7 @@ public class MainForm {
         gadgetDescValueLabel.setText("");
         gadgetInputPanel.add(gadgetDescValueLabel, new GridConstraints(1, 1, 1, 2, GridConstraints.ANCHOR_WEST, GridConstraints.FILL_NONE, GridConstraints.SIZEPOLICY_FIXED, GridConstraints.SIZEPOLICY_FIXED, null, null, null, 0, false));
         gadgetOpPanel = new JPanel();
-        gadgetOpPanel.setLayout(new GridLayoutManager(1, 5, new Insets(0, 0, 0, 0), -1, -1));
+        gadgetOpPanel.setLayout(new GridLayoutManager(1, 6, new Insets(0, 0, 0, 0), -1, -1));
         gadgetInputPanel.add(gadgetOpPanel, new GridConstraints(2, 0, 1, 3, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, null, null, null, 0, false));
         gadgetStartBtn = new JButton();
         gadgetStartBtn.setText("开始分析");
@@ -2566,7 +2604,7 @@ public class MainForm {
         final Spacer spacer6 = new Spacer();
         chainsDescPanel.add(spacer6, new GridConstraints(0, 1, 1, 1, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_HORIZONTAL, GridConstraints.SIZEPOLICY_WANT_GROW, 1, null, null, null, 0, false));
         chainsOpPanel = new JPanel();
-        chainsOpPanel.setLayout(new GridLayoutManager(2, 8, new Insets(5, 5, 5, 5), -1, -1));
+        chainsOpPanel.setLayout(new GridLayoutManager(2, 10, new Insets(5, 5, 5, 5), -1, -1));
         chainsPanel.add(chainsOpPanel, new GridConstraints(3, 0, 1, 2, GridConstraints.ANCHOR_CENTER, GridConstraints.FILL_BOTH, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, GridConstraints.SIZEPOLICY_CAN_SHRINK | GridConstraints.SIZEPOLICY_CAN_GROW, null, null, null, 0, false));
         chainsOpPanel.setBorder(BorderFactory.createTitledBorder(null, "启动配置", TitledBorder.DEFAULT_JUSTIFICATION, TitledBorder.DEFAULT_POSITION, null, null));
         startChainsBtn = new JButton();

@@ -25,9 +25,22 @@ public class HtmlGraphUtil {
     private static final String NODES_STR = "__NODES__";
     private static final String LINKS_STR = "__LINKS__";
     private static final String CURRENT_STR = "__CURRENT_NODE__";
+    private static final String PORT_STR = "__PORT__";
+    private static final String CHAINS_DATA_STR = "__CHAINS_DATA__";
 
     private static String getTemplate() {
-        InputStream is = CSSHandler.class.getClassLoader().getResourceAsStream("graph.html.temp");
+        InputStream is = CSSHandler.class.getClassLoader().getResourceAsStream("graph-interactive.html.temp");
+        if (is == null) {
+            is = CSSHandler.class.getClassLoader().getResourceAsStream("graph.html.temp");
+        }
+        if (is == null) {
+            return null;
+        }
+        return IOUtil.readString(is);
+    }
+
+    private static String getTaintTemplate() {
+        InputStream is = CSSHandler.class.getClassLoader().getResourceAsStream("taint-graph.html.temp");
         if (is == null) {
             return null;
         }
@@ -58,7 +71,21 @@ public class HtmlGraphUtil {
         // 注意无需有引号
         // A
         htmlOutput = htmlOutput.replace(CURRENT_STR, data.getCurrentNodeId());
+        htmlOutput = htmlOutput.replace(PORT_STR, String.valueOf(port));
 
+        return htmlOutput;
+    }
+
+    public static String renderTaintGraph(String chainsJson) {
+        String temp = getTaintTemplate();
+        if (temp == null) {
+            logger.error("taint graph template is null");
+            return null;
+        }
+        int port = GlobalOptions.getServerConfig().getPort();
+        String d3dsPath = String.format("http://127.0.0.1:%d/static/d3v6.js", port);
+        String htmlOutput = temp.replace(D3DS_STR, d3dsPath);
+        htmlOutput = htmlOutput.replace(CHAINS_DATA_STR, chainsJson);
         return htmlOutput;
     }
 }

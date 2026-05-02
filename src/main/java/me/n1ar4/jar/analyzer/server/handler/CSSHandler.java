@@ -20,9 +20,13 @@ import java.io.InputStream;
 public class CSSHandler extends BaseHandler implements HttpHandler {
     @Override
     public NanoHTTPD.Response handle(NanoHTTPD.IHTTPSession session) {
-        InputStream is = CSSHandler.class.getClassLoader().getResourceAsStream("report/BT_CSS.css");
+        String resource = "report/BT_CSS.css";
+        if ("/static/dashboard.css".equals(session.getUri())) {
+            resource = "server/dashboard.css";
+        }
+        InputStream is = CSSHandler.class.getClassLoader().getResourceAsStream(resource);
         if (is == null) {
-            return errorMsg("could not find BT_CSS.css");
+            return errorMsg("could not find css resource: " + resource);
         }
         String css = IOUtil.readString(is);
         return NanoHTTPD.newFixedLengthResponse(NanoHTTPD.Response.Status.OK, "text/css", css);

@@ -28,9 +28,14 @@ public class RenderEngine {
         return fullClassName.substring(fullClassName.lastIndexOf('.') + 1);
     }
 
-    public static String processGraph(MethodResult cur,
-                                      List<MethodResult> caller,
-                                      List<MethodResult> callee) {
+    private static String escapeJs(String s) {
+        if (s == null) return "";
+        return s.replace("\\", "\\\\").replace("'", "\\'");
+    }
+
+    public static String renderHtml(MethodResult cur,
+                                    List<MethodResult> caller,
+                                    List<MethodResult> callee) {
         methodIdStringMap.clear();
         MethodData data = new MethodData();
         String curId = generateId();
@@ -56,8 +61,16 @@ public class RenderEngine {
         for (Map.Entry<String, MethodResult> entry : methodIdStringMap.entrySet()) {
             String id = entry.getKey();
             MethodResult mr = entry.getValue();
-            String temp = String.format("{ id: '%s', name: '%s' },\n", id,
-                    getShortClassName(mr.getClassName()) + " " + mr.getMethodName());
+            String nodeType = id.equals(curId) ? "current"
+                    : callerIds.contains(id) ? "caller" : "callee";
+            String temp = String.format(
+                    "{ id: '%s', name: '%s', className: '%s', methodName: '%s', methodDesc: '%s', type: '%s' },\n",
+                    id,
+                    getShortClassName(mr.getClassName()) + " " + mr.getMethodName(),
+                    escapeJs(mr.getClassName()),
+                    escapeJs(mr.getMethodName()),
+                    escapeJs(mr.getMethodDesc() != null ? mr.getMethodDesc() : ""),
+                    nodeType);
             nodesBuffer.append(temp);
         }
 
@@ -76,10 +89,17 @@ public class RenderEngine {
         graphData.setNodes(nodesBuffer.toString());
         graphData.setLinks(linksBuffer.toString());
 
-        String html = HtmlGraphUtil.render(graphData);
+        return HtmlGraphUtil.render(graphData);
+    }
+
+    public static String processGraph(MethodResult cur,
+                                      List<MethodResult> caller,
+                                      List<MethodResult> callee) {
+        String html = renderHtml(cur, caller, callee);
         if (html == null) {
             return null;
         }
+
         try {
             String fileName = String.format("jar-analyzer-graph-%d.html", System.currentTimeMillis());
             Files.write(Paths.get(fileName), html.getBytes());
