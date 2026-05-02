@@ -568,14 +568,7 @@ async function onSearchByClass(event) {
         dom.searchClassInput.focus();
         return;
     }
-    await runSearch('/api/get_class_by_class', {class: className}, `类 ${className} 的信息`, {
-        transformData(data) {
-            if (!data) {
-                return [];
-            }
-            return Array.isArray(data) ? data : [data];
-        }
-    });
+    await runSearch('/api/get_class_by_class', {class: className}, `类 ${className} 的检索结果`);
 }
 
 async function onSearchByString(event) {

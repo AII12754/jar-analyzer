@@ -19,6 +19,8 @@ import me.n1ar4.jar.analyzer.server.handler.base.HttpHandler;
 import me.n1ar4.jar.analyzer.utils.StringUtil;
 import me.n1ar4.server.NanoHTTPD;
 
+import java.util.ArrayList;
+
 public class GetClassByClassHandler extends BaseHandler implements HttpHandler {
     @Override
     public NanoHTTPD.Response handle(NanoHTTPD.IHTTPSession session) {
@@ -30,8 +32,8 @@ public class GetClassByClassHandler extends BaseHandler implements HttpHandler {
         if (StringUtil.isNull(className)) {
             return needParam("class");
         }
-        ClassResult clazz = engine.getClassByClass(className);
-        String json = JSON.toJSONString(clazz);
+        ArrayList<ClassResult> classes = engine.getClassByClassLike(className);
+        String json = JSON.toJSONString(classes);
         return buildJSON(json);
     }
 }

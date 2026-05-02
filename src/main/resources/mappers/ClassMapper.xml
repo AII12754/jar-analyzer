@@ -33,6 +33,15 @@
         FROM class_table c
         WHERE c.class_name = #{className}
     </select>
+    <select id="selectClassByClassNameLike" resultMap="classMap">
+        SELECT DISTINCT c.class_name,
+                        c.super_class_name,
+                        c.jar_name,
+                        c.is_interface
+        FROM class_table c
+        WHERE c.class_name LIKE CONCAT('%', #{className}, '%')
+        ORDER BY c.class_name
+    </select>
     <!-- 这个方法写的比较抽象 -->
     <!-- 因为要兼容之前的版本 且避免在 JAVA 层消耗过高 -->
     <!-- 本质是 查 CLASS 全名里面是否包含了某个字符串 -->
